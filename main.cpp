@@ -88,42 +88,69 @@ int PrioridadeMinima<T>::extract_min() {
     return min;
 }
 
+
 //tem que ajeitar as pouco essa classe pro PP3
 // -x-x-x-x- Classe Tabuleiro baseada num grafo lista de adjacencias  -x-x-x-x-
-/*class Tabuleiro
+class Tabuleiro
 {
 private:
     uint num_vertices;
     uint num_edges;
-    std::vector<Vertex> *adj;
+    uint N; //dimensão do tabuleiro
+
+    std::vector<std::pair<Vertex,int>> *adj; //aq virou um par pois guarda o adk e o seu peso
     std::vector<std::pair<int, int>> movimentos = {
         {1, 2}, {1, -2}, {-1, 2}, {-1, -2}, {2, 1}, {2, -1}, {-2, 1}, {-2, -1}};
 
-    void criar_Grafo();
-    void insertionSort(std::vector<Vertex> &vec);
+    void criarGrafo();
+    void insertionSort(std::vector<std::pair<Vertex, int>> &vec);
+    int calcularPeso(Vertex u, Vertex v);
 
 public:
     Tabuleiro();
     ~Tabuleiro();
+
     void add_edge(Vertex u, Vertex v);
-    std::vector<Vertex> get_adj(Vertex u);
+    std::vector<std::pair<Vertex,int>> get_adj(Vertex u);
 
     uint get_edges();
     uint get_vertices();
+    int calcularPeso(int u, int v, int N);
 };
 
+//construtor do Grafo tabuleiro
 Tabuleiro::Tabuleiro()
 {
     num_vertices = 64;
     num_edges = 0;
-    adj = new std::vector<Vertex>[num_vertices];
-    criar_Grafo();
+    adj = new std::vector<std::pair<Vertex,int>>[num_vertices];
+    criarGrafo();
 }
 
+//destrutor do Grafo tabuleiro
 Tabuleiro::~Tabuleiro()
 {
     delete[] adj;
     adj = nullptr;
+}
+
+//calculadora de peso q o prof pediu
+//w(u,v)=(ascii(αu)⋅βu+ascii(αv)⋅βv)mod19 (fórmula)
+int Tabuleiro::calcularPeso(int u, int v, int N) {
+    int linha_u = u / N;
+    int coluna_u = u % N;
+
+    char alpha_u = 'a' + coluna_u; //au
+    int beta_u = linha_u + 1; //bu
+
+    int linha_v = v / N;
+    int coluna_v = v % N;
+
+    char alpha_v = 'a' + coluna_v; //av
+    int beta_v = linha_v + 1; //bv
+
+    //esse int(letra) = ascii(letra)
+    return ((int(alpha_u) * beta_u + int(alpha_v) * beta_v) % 19);
 }
 
 void Tabuleiro::add_edge(Vertex u, Vertex v)
@@ -133,12 +160,15 @@ void Tabuleiro::add_edge(Vertex u, Vertex v)
         throw std::invalid_argument("Valores invalidos");
     }
 
-    adj[u].push_back(v);
-    adj[v].push_back(u);
+    int weight = calcularPeso(u, v, N);
+
+    //aq o adj cria uma nova aresta
+    adj[u].push_back({v,weight});
+    adj[v].push_back({u, weight});
     num_edges += 1;
 }
 
-std::vector<Vertex> Tabuleiro::get_adj(Vertex u)
+std::vector<std::pair<Vertex,int>> Tabuleiro::get_adj(Vertex u)
 {
     if (u >= num_vertices)
     {
@@ -157,7 +187,7 @@ uint Tabuleiro::get_vertices()
     return num_vertices;
 }
 
-void Tabuleiro::criar_Grafo()
+void Tabuleiro::criarGrafo()
 {
     for (int linha = 0; linha < 8; ++linha)
     {
@@ -189,19 +219,19 @@ void Tabuleiro::criar_Grafo()
     }
 }
 
-void Tabuleiro::insertionSort(std::vector<Vertex> &vec)
+void Tabuleiro::insertionSort(std::vector<std::pair<Vertex,int>> &vec)
 {
     if (vec.size() < 2)
     {
         return;
     }
 
-    for (Vertex i = 1; i < vec.size(); i++)
+    for (int i = 1; i < vec.size(); i++)
     {
-        Vertex key = vec[i];
+        auto key = vec[i];
         int j = i - 1;
 
-        while (j >= 0 && vec[j] > key)
+        while (j >= 0 && vec[j].first > key.first)
         {
             vec[j + 1] = vec[j];
             j = j - 1;
@@ -209,7 +239,7 @@ void Tabuleiro::insertionSort(std::vector<Vertex> &vec)
         vec[j + 1] = key;
     }
 }
-
+/*
 class AtaqueDosCavaleiros
 {
 private:
@@ -294,11 +324,17 @@ void AtaqueDosCavaleiros::solucionar(Tabuleiro &tabubu)
     std::cout << std::endl;
 }*/
 
+
 int main()
 {
     int line = 0;
+    int armyNumber;
     std::string army;
     std::vector <std::string> listArmys;
+    std::string castelPosition;
+    int stormsNumber;
+    std::string storm;
+    std::vector <std::string> stormsPositions;
 
     //linhas e colunas são a mesma quantidade D:
     std::cin >> line;
@@ -308,11 +344,23 @@ int main()
         throw std::invalid_argument("O número de colunas linhas deve ser maior que 8 e menor que 15");
     }
 
+    std::cin >> armyNumber;
+
     //loop para adicionar as cores do exercito, inimigos, local de início etc no listaExercitos
-    for (int i=0; i < 5; i++) {
+    for (int i=0; i < armyNumber; i++) {
         std::cin >> army;
         listArmys.push_back(army);
     }
+
+    std::cin >> castelPosition;
+    std::cin >> stormsNumber;
+
+    //adiciona as posicoes das tormentas a uma lista
+    for (int i=0; i < stormsNumber; i++) {
+        std::cin >> storm;
+        stormsPositions.push_back(storm);
+    }
+
 
     return 0;
 }
