@@ -104,15 +104,13 @@ private:
 
     void criarGrafo();
     void insertionSort(std::vector<std::pair<Vertex, int>> &vec);
-    int calcularPeso(Vertex u, Vertex v);
+    std::vector<std::pair<Vertex,int>> get_adj(Vertex u);
 
 public:
     Tabuleiro();
     ~Tabuleiro();
 
     void add_edge(Vertex u, Vertex v);
-    std::vector<std::pair<Vertex,int>> get_adj(Vertex u);
-
     uint get_edges();
     uint get_vertices();
     int calcularPeso(int u, int v, int N);
@@ -187,21 +185,22 @@ uint Tabuleiro::get_vertices()
     return num_vertices;
 }
 
+//como agr o tamanho do tabuleiro pode mudar de tamanho coloca-se N ao inves do 8 anterior
 void Tabuleiro::criarGrafo()
 {
-    for (int linha = 0; linha < 8; ++linha)
+    for (int linha = 0; linha < N; ++linha)
     {
-        for (int coluna = 0; coluna < 8; ++coluna)
+        for (int coluna = 0; coluna < N; ++coluna)
         {
-            int vertice_origem = linha * 8 + coluna;
+            int vertice_origem = linha * N + coluna;
             for (const auto &mov : movimentos)
             {
                 int nova_linha = linha + mov.first;
                 int nova_coluna = coluna + mov.second;
-                if (nova_linha >= 0 && nova_linha < 8 && nova_coluna >= 0 && nova_coluna < 8)
+                if (nova_linha >= 0 && nova_linha < N && nova_coluna >= 0 && nova_coluna < N)
                 {
 
-                    int vertice_destino = nova_linha * 8 + nova_coluna;
+                    int vertice_destino = nova_linha * N + nova_coluna;
 
 
                     if (vertice_origem < vertice_destino)
@@ -239,65 +238,72 @@ void Tabuleiro::insertionSort(std::vector<std::pair<Vertex,int>> &vec)
         vec[j + 1] = key;
     }
 }
-/*
-class AtaqueDosCavaleiros
+
+class AtaqueDosExercitos
 {
 private:
-    std::vector<std::string> cavaleiros;
-    std::string reiPosicao;
-    std::vector<int> ameacasRei();
+    std::vector<std::string> armys;
+    std::string castelPosition;
+    std::vector<std::string> storms;
+
+    std::vector<int> castleChess();
     int melhorCaminhoAoRei(Tabuleiro &tabubu, int no_inicio, const std::vector<int> &listaAmeacas);
 
     std::pair<int, int> ChessNotToPos(const std::string &position);
 
 public:
-    AtaqueDosCavaleiros(std::vector<std::string> knights, std::string king);
+    AtaqueDosExercitos(std::vector<std::string> listArmy, std::string castelPosition, std::vector<std::string> storms);
     void solucionar( Tabuleiro &tabubu);
 };
 
-AtaqueDosCavaleiros::AtaqueDosCavaleiros(std::vector<std::string> knights, std::string king)
+AtaqueDosExercitos::AtaqueDosExercitos(std::vector<std::string> listArmy, std::string castelPosition, std::vector<std::string> storms)
 {
-    this->reiPosicao = king;
-    this->cavaleiros = knights;
+    this->castelPosition = castelPosition;
+    this->armys = listArmy;
+    this->storms = storms;
+
 }
 
-std::pair<int, int> AtaqueDosCavaleiros::ChessNotToPos(const std::string &position)
+std::pair<int, int> AtaqueDosExercitos::ChessNotToPos(const std::string &position)
 {
     return {position[1] - '1', position[0] - 'a'};
 }
 
-std::vector<int> AtaqueDosCavaleiros::ameacasRei()
+std::vector<int> AtaqueDosExercitos::castleChess()
 {
+    //movimentos dos exércitos em formato de L (fazuelli)
     const std::vector<std::pair<int, int>> movimentos = {
         {2, 1}, {2, -1}, {-2, 1}, {-2, -1}, {1, 2}, {1, -2}, {-1, 2}, {-1, -2}};
 
-    int coluna = reiPosicao[0] - 'a';
-    int linha = reiPosicao[1] - '1';
+    int coluna = castelPosition[0] - 'a';
+    int linha = castelPosition[1] - '1';
 
-    std::vector<int> listaAmeacas;
+    //a listSus é uma lista de possíveis chegadas ao castelo
+    std::vector<int> listSus;
+    
     for (auto mov : movimentos)
     {
         int nova_linha = linha + mov.first;
         int nova_coluna = coluna + mov.second;
         if (nova_linha >= 0 && nova_linha < 8 && nova_coluna >= 0 && nova_coluna < 8)
         {
-            listaAmeacas.push_back(nova_linha * 8 + nova_coluna);
+            listSus.push_back(nova_linha * 8 + nova_coluna);
         }
     }
 
-    return listaAmeacas;
+    return listSus;
 }
 
 
 
-void AtaqueDosCavaleiros::solucionar(Tabuleiro &tabubu)
+void AtaqueDosExercitos::solucionar(Tabuleiro &tabubu)
 {
-    std::vector<int> posicao_alvo = ameacasRei();
+    std::vector<int> posicao_alvo = castleChess();
     std::vector<int> resultados;
 
     int minimo_mov = 3000;
 
-    for (const auto &cavalo : this->cavaleiros)
+    for (const auto &cavalo : this->armys)
     {
         std::pair<int, int> cava_pos = ChessNotToPos(cavalo);
         Vertex no_inicio = cava_pos.first * 8 + cava_pos.second;
@@ -322,7 +328,7 @@ void AtaqueDosCavaleiros::solucionar(Tabuleiro &tabubu)
         }
     }
     std::cout << std::endl;
-}*/
+}
 
 
 int main()
