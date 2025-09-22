@@ -3,6 +3,7 @@
 #include <vector>
 #include <stdexcept>
 #include <algorithm>
+#include <sstream>
 
 using Vertex = unsigned int;
 using uint = unsigned int;
@@ -19,7 +20,8 @@ private:
 
     //"subir" na árvore do heap se não atender aos requesitos da árvore
     //caso o filho de cima seja menor que o de baixo etc
-    void sift_up(int i) {
+    void sift_up(int i)
+    {
         while (i > 0 && heap[i] < heap[parent(i)]) {
             T temp = heap[i];
             heap[i] = heap[parent(i)];
@@ -30,7 +32,8 @@ private:
 
     //quando o minimo e removido, fica um buraco no árvore do heap
     //o sift_down "desce" o menor número e faz dnv a comparação para verificar novamente
-    void sift_down(int i) {
+    void sift_down(int i)
+    {
         int n = heap.size();
         while (true) {
             int smallest = i;
@@ -113,8 +116,9 @@ public:
 
     void add_edge(Vertex u, Vertex v);
     uint get_edges();
-    std::vector<std::pair<Vertex,int>> get_adj(Vertex u);
+    const std::vector<std::pair<Vertex,int>>& get_adj(Vertex u) const;
     uint get_vertices();
+    uint get_size() const { return N;};
     int calcularPeso(int u, int v, int N);
 };
 
@@ -152,6 +156,7 @@ int Tabuleiro::calcularPeso(int u, int v, int N) {
     char alpha_v = 'a' + coluna_v; //av
     int beta_v = linha_v + 1; //bv
 
+    std::cout << "O calcular peso ta funcionando eu achor" << std::endl;
     //esse int(letra) = ascii(letra)
     return ((int(alpha_u) * beta_u + int(alpha_v) * beta_v) % 19);
 }
@@ -160,7 +165,7 @@ void Tabuleiro::add_edge(Vertex u, Vertex v)
 {
     if (u >= num_vertices || v >= num_vertices || u == v)
     {
-        throw std::invalid_argument("Valores invalidos");
+        throw std::invalid_argument("Valores invalidos no add_edge");
     }
 
     int weight = calcularPeso(u, v, N);
@@ -169,13 +174,15 @@ void Tabuleiro::add_edge(Vertex u, Vertex v)
     adj[u].push_back({v,weight});
     adj[v].push_back({u, weight});
     num_edges += 1;
+
+    std::cout << "O add_edge ta de boas tbm eu acho" << std::endl;
 }
 
-std::vector<std::pair<Vertex,int>> Tabuleiro::get_adj(Vertex u)
+const std::vector<std::pair<Vertex,int>>& Tabuleiro::get_adj(Vertex u) const
 {
     if (u >= num_vertices)
     {
-        throw std::invalid_argument("Valores invalidos");
+        throw std::invalid_argument("Valores invalidos no get_adj");
     }
     return adj[u];
 }
@@ -255,41 +262,54 @@ struct ResultadoCaminho {
         : distancia(d), caminho(std::move(c)) {}
 };
 
+struct Army {
+    std::string color;
+    std::string position;
+    std::vector<std::string> friends;
+};
+
 // -x-x-x-x- Classe AtaqueDosExercitos  -x-x-x-x-
 class AtaqueDosExercitos
 {
 private:
-    std::vector<std::string> armys;
+    std::vector<Army> armys;
     std::string castelPosition;
     std::vector<std::string> storms;
 
-    std::vector<int> castleChess();
+    std::vector<int> castleChess(Tabuleiro tabuleiro);
     bool isStorm(int v, int N);
     ResultadoCaminho melhorCaminhoAoRei(Tabuleiro &tabubu, int no_inicio, const std::vector<int> &listaAmeacas);
 
     std::pair<int, int> ChessNotToPos(const std::string &position);
 
 public:
-    AtaqueDosExercitos(std::vector<std::string> listArmy, std::string castelPosition, std::vector<std::string> storms);
+    AtaqueDosExercitos(std::vector<Army> listArmy, std::string castelPosition, std::vector<std::string> storms);
     void solucionar( Tabuleiro &tabubu);
 };
 
-AtaqueDosExercitos::AtaqueDosExercitos(std::vector<std::string> listArmy, std::string castelPosition, std::vector<std::string> storms)
+AtaqueDosExercitos::AtaqueDosExercitos(std::vector<Army> listArmy, std::string castelPosition, std::vector<std::string> storms)
 {
     this->castelPosition = castelPosition;
     this->armys = listArmy;
     this->storms = storms;
-
+    std::cout << "Construtor dos exércitos criado" << std::endl;
 }
 
 //converte notação tipo "a1" em coordenadas (linha, coluna)
 std::pair<int, int> AtaqueDosExercitos::ChessNotToPos(const std::string &position)
 {
-    return {position[1] - '1', position[0] - 'a'};
+    if (position.size() < 2) {
+        throw std::invalid_argument("Posição inválida");
+    }
+
+    //aqui precisa do stoi pq se for a10, a11 etc da errador
+    int coluna = position[0] - 'a';
+    int linha = std::stoi(position.substr(1)) - 1;
+    return {linha, coluna};
 }
 
 //gera as posições que são vizinhas do castelo (um cavalo pode alcançar)
-std::vector<int> AtaqueDosExercitos::castleChess()
+std::vector<int> AtaqueDosExercitos::castleChess(Tabuleiro tabuleiro)
 {
     //movimentos dos exércitos em formato de L (fazuelli)
     const std::vector<std::pair<int, int>> movimentos = {
@@ -305,9 +325,9 @@ std::vector<int> AtaqueDosExercitos::castleChess()
     {
         int nova_linha = linha + mov.first;
         int nova_coluna = coluna + mov.second;
-        if (nova_linha >= 0 && nova_linha < 8 && nova_coluna >= 0 && nova_coluna < 8)
+        if (nova_linha >= 0 && nova_linha < tabuleiro.get_size() && nova_coluna >= 0 && nova_coluna < 8)
         {
-            listSus.push_back(nova_linha * 8 + nova_coluna);
+            listSus.push_back(nova_linha * tabuleiro.get_size() + nova_coluna);
         }
     }
 
@@ -379,68 +399,84 @@ ResultadoCaminho AtaqueDosExercitos::melhorCaminhoAoRei(Tabuleiro &tabubu, int n
 //solucionar executa o cálculo para todos os exércitos
 void AtaqueDosExercitos::solucionar(Tabuleiro &tabubu)
 {
-    std::vector<int> posicao_alvo = castleChess();
+    std::cout << std::endl << "Solucionar está sendo chamado" << std::endl;
 
-    for (const auto &cavalo : this->armys)
+    std::vector<int> posicao_alvo = castleChess(tabubu);
+
+    for (const auto &exercito : this->armys)
     {
-        std::pair<int, int> cava_pos = ChessNotToPos(cavalo);
-        Vertex no_inicio = cava_pos.first * 8 + cava_pos.second;
+        std::string cor = exercito.color;
+        std::string posicao = exercito.position;
+
+        std::pair<int, int> cava_pos = ChessNotToPos(posicao);
+        Vertex no_inicio = cava_pos.first * tabubu.get_size() + cava_pos.second;
 
         ResultadoCaminho resultado = melhorCaminhoAoRei(tabubu, no_inicio, posicao_alvo);
 
         if (resultado.distancia != -1) {
-            std::cout << "Exército em " << cavalo
-                      << " chega em " << resultado.distancia << " movimentos.\n";
+            std::cout << "Exército " << cor << " em " << posicao
+                  << " chega em " << resultado.distancia << " movimentos.\n";
 
             std::cout << "Caminho: ";
             for (auto v : resultado.caminho) {
-                int l = v / 8;
-                int c = v % 8;
+                int l = v / tabubu.get_size() ;
+                int c = v % tabubu.get_size();
                 char colChar = 'a' + c;
                 char rowChar = '1' + l;
                 std::cout << colChar << rowChar << " ";
             }
             std::cout << "\n";
         } else {
-            std::cout << "Exército em " << cavalo << " não encontrou caminho.\n";
+            std::cout << "Exército " << cor << " em " << posicao
+                  << " não encontrou caminho.\n";
         }
     }
 }
 
+
+
 int main()
 {
     int line = 0;
-    int armyNumber;
-    std::string army;
-    std::vector <std::string> listArmys;
-    std::string castelPosition;
-    int stormsNumber;
-    std::string storm;
-    std::vector <std::string> stormsPositions;
-
-    //linhas e colunas são a mesma quantidade D:
-    std::cin >> line;
+    std::cin >> line; //linhas e colunas são a mesma quantidade D:
 
     //um "catch" para caso a quantidade de linhas/colunas não respeitem as regras
     if (line < 8 || line > 15) {
         throw std::invalid_argument("O número de colunas linhas deve ser maior que 8 e menor que 15");
     }
 
+    int armyNumber;
     std::cin >> armyNumber;
+    std::cin.ignore();
+
+    std::vector<Army> listArmys;
 
     //loop para adicionar as cores do exercito, inimigos, local de início etc no listaExercitos
     for (int i = 0; i < armyNumber; i++) {
-        std::cin >> army;
+        std::string line;
+        std::getline(std::cin, line); // le a linha inteira
+
+        std::istringstream iss(line);
+        Army army;
+        iss >> army.color >> army.position;
+
+        std::string aliado;
+        while (iss >> aliado) {
+            army.friends.push_back(aliado);
+        }
+
         listArmys.push_back(army);
     }
 
+    std::string castelPosition;
     std::cin >> castelPosition;
-    std::cin >> stormsNumber;
 
-    //adiciona as posicoes das tormentas a uma lista
-    for (int i=0; i < stormsNumber; i++) {
-        std::cin >> storm;
-        stormsPositions.push_back(storm);
+    //adiciona as tormentas a uma lista
+    int stormsNumber;
+    std::cin >> stormsNumber;
+    std::vector<std::string> stormsPositions(stormsNumber);
+    for (int i = 0; i < stormsNumber; ++i) {
+        std::cin >> stormsPositions[i];
     }
 
 
@@ -448,7 +484,23 @@ int main()
     //cria tabuleiro e executa a simulação
     Tabuleiro tab(line);
     AtaqueDosExercitos jogo(listArmys, castelPosition, stormsPositions);
+
+    std::cout << "Tabuleiro " << line << "x" << line << std::endl;
+    for (auto &e : listArmys) {
+        std::cout << "Exercito: " << e.color << " posicao: " << e.position;
+        if (!e.friends.empty()) {
+            std::cout << " aliados: ";
+            for (auto &a : e.friends)
+                std::cout << a << " ";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "Castelo em: " << castelPosition << std::endl;
+    for (auto &s : stormsPositions)
+        std::cout << "Storm em: " << s << std::endl;
+
     jogo.solucionar(tab);
+
 
     return 0;
 }
