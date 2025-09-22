@@ -1,7 +1,8 @@
 #include <iostream>
 #include <list>
 #include <vector>
-
+#include <stdexcept>
+#include <algorithm>
 
 using Vertex = unsigned int;
 using uint = unsigned int;
@@ -20,7 +21,7 @@ private:
     //caso o filho de cima seja menor que o de baixo etc
     void sift_up(int i) {
         while (i > 0 && heap[i] < heap[parent(i)]) {
-            int temp = heap[i];
+            T temp = heap[i];
             heap[i] = heap[parent(i)];
             heap[parent(i)] = temp;
             i = parent(i);
@@ -40,7 +41,7 @@ private:
                 smallest = right(i);
             }
             if (smallest != i) {
-                int temp = heap[i];
+                T temp = heap[i];
                 heap[i] = heap[smallest];
                 heap[smallest] = temp;
                 i = smallest;
@@ -51,14 +52,14 @@ private:
 public:
     bool empty() const { return heap.empty(); }
     int size() const { return heap.size(); }
-    int minimum(std::vector<T> heap) const;
+    T minimum(std::vector<T> heap) const;
     void insert(T element);
-    int extract_min();
+    T extract_min();
 };
 
 //retorna mínimo
 template<typename T>
-int PrioridadeMinima<T>::minimum(std::vector<T> heap) const{
+T PrioridadeMinima<T>::minimum(std::vector<T> heap) const{
     if (heap.empty()) {
         throw std::runtime_error("Heap vazior");
     }
@@ -74,11 +75,11 @@ void PrioridadeMinima<T>::insert(T element) {
 
 // remove e retorna o mínimo
 template<typename T>
-int PrioridadeMinima<T>::extract_min() {
+T PrioridadeMinima<T>::extract_min() {
     if (heap.empty()) {
         throw std::runtime_error("Heap vazior");
     }
-    int min = heap[0];
+    T min = heap[0];
     heap[0] = heap.back();
     heap.pop_back();
     if (!heap.empty()) {
@@ -104,24 +105,28 @@ private:
 
     void criarGrafo();
     void insertionSort(std::vector<std::pair<Vertex, int>> &vec);
-    std::vector<std::pair<Vertex,int>> get_adj(Vertex u);
+
 
 public:
-    Tabuleiro();
+    Tabuleiro(uint N = 8);
     ~Tabuleiro();
 
     void add_edge(Vertex u, Vertex v);
     uint get_edges();
+    std::vector<std::pair<Vertex,int>> get_adj(Vertex u);
     uint get_vertices();
     int calcularPeso(int u, int v, int N);
 };
 
 //construtor do Grafo tabuleiro
-Tabuleiro::Tabuleiro()
+Tabuleiro::Tabuleiro(uint N)
 {
-    num_vertices = 64;
+    this->N = N;
+    num_vertices = N * N;
     num_edges = 0;
     adj = new std::vector<std::pair<Vertex,int>>[num_vertices];
+    std::cout << "O tabuleiro foi criado com sucessor!" << std::endl;
+
     criarGrafo();
 }
 
@@ -188,6 +193,7 @@ uint Tabuleiro::get_vertices()
 //como agr o tamanho do tabuleiro pode mudar de tamanho coloca-se N ao inves do 8 anterior
 void Tabuleiro::criarGrafo()
 {
+    std::cout << "O grafo esta sendo criador no inicior!" << std::endl;
     for (int linha = 0; linha < N; ++linha)
     {
         for (int coluna = 0; coluna < N; ++coluna)
@@ -199,9 +205,7 @@ void Tabuleiro::criarGrafo()
                 int nova_coluna = coluna + mov.second;
                 if (nova_linha >= 0 && nova_linha < N && nova_coluna >= 0 && nova_coluna < N)
                 {
-
                     int vertice_destino = nova_linha * N + nova_coluna;
-
 
                     if (vertice_origem < vertice_destino)
                     {
@@ -214,6 +218,7 @@ void Tabuleiro::criarGrafo()
 
     for (uint u = 0; u < num_vertices; ++u)
     {
+        std::cout << "O vertice " << u << " esta sendo adicionador" << std::endl;
         insertionSort(adj[u]);
     }
 }
@@ -239,6 +244,18 @@ void Tabuleiro::insertionSort(std::vector<std::pair<Vertex,int>> &vec)
     }
 }
 
+// ----------------- Estrutura auxiliar para guardar o caminho -----------------
+// ta aqui a struct que guarda a distância e o caminho percorrido
+struct ResultadoCaminho {
+    int distancia;
+    std::vector<int> caminho;
+
+    //construtor pq da erro la na frente por causa do pair
+    ResultadoCaminho(int d, std::vector<int> c)
+        : distancia(d), caminho(std::move(c)) {}
+};
+
+// -x-x-x-x- Classe AtaqueDosExercitos  -x-x-x-x-
 class AtaqueDosExercitos
 {
 private:
@@ -247,7 +264,8 @@ private:
     std::vector<std::string> storms;
 
     std::vector<int> castleChess();
-    int melhorCaminhoAoRei(Tabuleiro &tabubu, int no_inicio, const std::vector<int> &listaAmeacas);
+    bool isStorm(int v, int N);
+    ResultadoCaminho melhorCaminhoAoRei(Tabuleiro &tabubu, int no_inicio, const std::vector<int> &listaAmeacas);
 
     std::pair<int, int> ChessNotToPos(const std::string &position);
 
@@ -264,11 +282,13 @@ AtaqueDosExercitos::AtaqueDosExercitos(std::vector<std::string> listArmy, std::s
 
 }
 
+//converte notação tipo "a1" em coordenadas (linha, coluna)
 std::pair<int, int> AtaqueDosExercitos::ChessNotToPos(const std::string &position)
 {
     return {position[1] - '1', position[0] - 'a'};
 }
 
+//gera as posições que são vizinhas do castelo (um cavalo pode alcançar)
 std::vector<int> AtaqueDosExercitos::castleChess()
 {
     //movimentos dos exércitos em formato de L (fazuelli)
@@ -280,7 +300,7 @@ std::vector<int> AtaqueDosExercitos::castleChess()
 
     //a listSus é uma lista de possíveis chegadas ao castelo
     std::vector<int> listSus;
-    
+
     for (auto mov : movimentos)
     {
         int nova_linha = linha + mov.first;
@@ -294,42 +314,98 @@ std::vector<int> AtaqueDosExercitos::castleChess()
     return listSus;
 }
 
+//verificação se tem Storm na posição do tabuleiro
+bool AtaqueDosExercitos::isStorm(int v, int N) {
+    int linha = v / N;
+    int coluna = v % N;
+    for (auto &s : storms) {
+        int l = s[1] - '1';
+        int c = s[0] - 'a';
+        if (l == linha && c == coluna) return true;
+    }
+    return false;
+}
 
+// ----------------- Implementação do Dijkstra + reconstrução de caminho -----------------
+ResultadoCaminho AtaqueDosExercitos::melhorCaminhoAoRei(Tabuleiro &tabubu, int no_inicio, const std::vector<int> &listaAmeacas) {
+    int V = tabubu.get_vertices();
+    std::vector<int> dist(V, 1e9); //1e9 é o infinito
+    std::vector<int> parent(V, -1);
 
+    // pair{distancia acumulada, vértice}
+    PrioridadeMinima<std::pair<int,int>> pm;
+
+    // Inicialização
+    dist[no_inicio] = 0;
+    pm.insert({0, no_inicio});
+
+    // Enquanto houver vértices a processar
+    while (!pm.empty()) {
+        auto par = pm.extract_min();
+        int d = par.first;
+        int u = par.second;
+
+        if (d > dist[u]) continue;
+
+        if (d > dist[u]) continue;
+
+        // Se o vértice atual é uma posição válida do castelo -> encontramos caminho
+        if (std::find(listaAmeacas.begin(), listaAmeacas.end(), u) != listaAmeacas.end()) {
+            // Reconstruir o caminho até 'u'
+            std::vector<int> caminho;
+            for (int v = u; v != -1; v = parent[v]) {
+                caminho.push_back(v);
+            }
+            std::reverse(caminho.begin(), caminho.end());
+
+            return {dist[u], caminho};
+        }
+
+        // Relaxamento das arestas
+        for (auto [v, peso] : tabubu.get_adj(u)) {
+            // Aqui você pode checar se 'v' é tormenta e ignorar
+            if (dist[v] > dist[u] + peso) {
+                dist[v] = dist[u] + peso;
+                parent[v] = u;
+                pm.insert({dist[v], v});
+            }
+        }
+    }
+
+    // Se não encontrou caminho até o castelo
+    return {-1, {}};
+}
+
+//solucionar executa o cálculo para todos os exércitos
 void AtaqueDosExercitos::solucionar(Tabuleiro &tabubu)
 {
     std::vector<int> posicao_alvo = castleChess();
-    std::vector<int> resultados;
-
-    int minimo_mov = 3000;
 
     for (const auto &cavalo : this->armys)
     {
         std::pair<int, int> cava_pos = ChessNotToPos(cavalo);
         Vertex no_inicio = cava_pos.first * 8 + cava_pos.second;
-        int move = melhorCaminhoAoRei(tabubu, no_inicio, posicao_alvo);
-        resultados.push_back(move);
-        if (move != -1 && move < minimo_mov)
-        {
-            minimo_mov = move;
+
+        ResultadoCaminho resultado = melhorCaminhoAoRei(tabubu, no_inicio, posicao_alvo);
+
+        if (resultado.distancia != -1) {
+            std::cout << "Exército em " << cavalo
+                      << " chega em " << resultado.distancia << " movimentos.\n";
+
+            std::cout << "Caminho: ";
+            for (auto v : resultado.caminho) {
+                int l = v / 8;
+                int c = v % 8;
+                char colChar = 'a' + c;
+                char rowChar = '1' + l;
+                std::cout << colChar << rowChar << " ";
+            }
+            std::cout << "\n";
+        } else {
+            std::cout << "Exército em " << cavalo << " não encontrou caminho.\n";
         }
     }
-
-
-    bool first = true;
-    for (int move_count : resultados)
-    {
-        if (move_count == minimo_mov)
-        {
-            if (!first)
-                std::cout << " ";
-            std::cout << move_count;
-            first = false;
-        }
-    }
-    std::cout << std::endl;
 }
-
 
 int main()
 {
@@ -353,7 +429,7 @@ int main()
     std::cin >> armyNumber;
 
     //loop para adicionar as cores do exercito, inimigos, local de início etc no listaExercitos
-    for (int i=0; i < armyNumber; i++) {
+    for (int i = 0; i < armyNumber; i++) {
         std::cin >> army;
         listArmys.push_back(army);
     }
@@ -367,6 +443,12 @@ int main()
         stormsPositions.push_back(storm);
     }
 
+
+
+    //cria tabuleiro e executa a simulação
+    Tabuleiro tab(line);
+    AtaqueDosExercitos jogo(listArmys, castelPosition, stormsPositions);
+    jogo.solucionar(tab);
 
     return 0;
 }
