@@ -450,55 +450,73 @@ bool isAlly(const EstadoExercito &estado, const std::string &color) {
 
 
 bool ArmysAttack::executeRound(std::vector<EstadoExercito> &estados, Graph_Board &game_graph,
-                               int round, int castle_vertex, int &less_moviments_arrival) {
+                               int rodada, int castle_vertex, int &less_moviments_arrival) {
     int N = game_graph.get_size();
     bool moviment_happened = false;
     std::vector<std::string> arrived_this_round;
 
+    std::cout << "RODADA " << rodada << " --------\n";
+
+    // Processa todos os exércitos nesta rodada
     for (auto &estado: estados) {
+        std::cout << "Exercito: " << estado.color
+                  << " | Posicao atual: " << estado.position
+                  << " | Movimentos: " << estado.moviments
+                  << " | Status: " << (estado.arrived ? "CHEGOU" : estado.stopped ? "PARADO" : "EM MOVIMENTO")
+                  << "\n";
+
         if (estado.arrived) continue;
+
         if (estado.stopped) {
-            estado.stopped = false;
+            estado.stopped = false; // libera o stop
             moviment_happened = true;
             continue;
         }
-        if (estado.pos_idx + 1 >= (int) estado.path.size()) continue;
+
+        if (estado.pos_idx + 1 >= (int)estado.path.size()) continue;
 
         int proxima_pos = estado.path[estado.pos_idx + 1];
 
-        //chama o verificar tempestade
         if (tryStorm(estado, proxima_pos, N)) {
+            std::cout << "  -> Encontrou tempestade, parada obrigatória.\n";
             continue;
         }
 
-        //chama o verificar inimigo
         if (tryEnemy(estado, proxima_pos, estados)) {
+            std::cout << "  -> Encontrou inimigo, parada obrigatória ou formação de aliança.\n";
             continue;
         }
 
         int peso = game_graph.calcularPeso(estado.position, proxima_pos, N);
         move(estado, proxima_pos, peso, castle_vertex, N);
 
+        std::cout << "  -> Movido para " << proxima_pos
+                  << ", peso do movimento: " << peso
+                  << ", status agora: " << (estado.arrived ? "CHEGOU" : "EM MOVIMENTO")
+                  << "\n";
+
         if (estado.arrived) {
             arrived_this_round.push_back(estado.color);
             less_moviments_arrival = std::min(less_moviments_arrival, estado.moviments);
         }
+
         moviment_happened = true;
     }
 
-    // parar apenas se todos que chegaram nesta rodada usaram o minimo de movimentos
-    if (!arrived_this_round.empty()) {
-        for (auto &color: arrived_this_round) {
-            auto it = std::find_if(estados.begin(), estados.end(), [&](auto &e) { return e.color == color; });
-            if (it != estados.end() && it->moviments > less_moviments_arrival) {
-                return true; // continua simulacao
-            }
+    // Verifica se ainda existe algum exército que pode se mover
+    bool any_movable_left = false;
+    for (auto &estado: estados) {
+        if (!estado.arrived && !estado.stopped && estado.pos_idx + 1 < (int)estado.path.size()) {
+            any_movable_left = true;
+            break;
         }
-        return false; // pode parar
     }
 
-    return moviment_happened;
+    std::cout << "Fim da RODADA " << rodada << "\n\n";
+
+    return any_movable_left;
 }
+
 
 std::vector<resultArmy> ArmysAttack::processResult(const std::vector<EstadoExercito> &estados,
                                                           int less_moviments_arrival) {
@@ -611,8 +629,6 @@ resultPath ArmysAttack::bestPathToCastle(Graph_Board &game_board,
 
     if (destino_final != -1) {
         auto caminho = reconstructPath(destino_final, parent);
-
-        int N = game_board.get_size();
 
         return {less_distant, caminho};
     }
