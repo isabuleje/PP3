@@ -451,16 +451,13 @@ bool ArmysAttack::isStorm(int v, int N) {
 
 //verifica se o exercito e amiguinho ou nao
 bool ArmysAttack::canBeAlly(const EstadoExercito &a, const EstadoExercito &b) {
-    // se b estiver na lista de inimigos de a, não pode ser aliado
     if (std::find(a.enemies.begin(), a.enemies.end(), b.color) != a.enemies.end()) {
         return false;
     }
-    // se a estiver na lista de inimigos de b, também não pode ser aliado
     if (std::find(b.enemies.begin(), b.enemies.end(), a.color) != b.enemies.end()) {
         return false;
     }
 
-    // ainda não aliados, mas podem se tornar se se encontrarem
     return true;
 }
 
@@ -468,7 +465,7 @@ bool ArmysAttack::canBeAlly(const EstadoExercito &a, const EstadoExercito &b) {
 //se nao estiver junto de um aliado ele para, mas se estiver destroe a tempestade na hora
 bool ArmysAttack::tryStorm(EstadoExercito &estado, int next_position, int N) {
     if (isStorm(next_position, N)) {
-        //se ele não tiver nenhum amiguinho ele para
+        //se ele nao tiver nenhum amiguinho ele para
         if (estado.allys.empty()) {
             estado.stopped = true;
             return true; // perde rodada
@@ -514,17 +511,9 @@ bool ArmysAttack::executeRound(std::vector<EstadoExercito> &estados, Graph_Board
     std::vector<int> arrived_this_round;
     std::vector<std::string> castle_occupants;
 
-    std::cout << "RODADA " << round << " --------\n";
-
     // Processa todos os exercitos nesta rodada
     for (size_t i = 0; i < estados.size(); ++i) {
         auto &estado = estados[i];
-
-        std::cout << "Exercito: " << estado.color
-                  << " | Posicao atual: " << estado.position
-                  << " | Movimentos: " << estado.moviments
-                  << " | Status: " << (estado.arrived ? "CHEGOU" : estado.stopped ? "PARADO" : "EM MOVIMENTO")
-                  << "\n";
 
         if (estado.arrived) continue;
 
@@ -539,27 +528,19 @@ bool ArmysAttack::executeRound(std::vector<EstadoExercito> &estados, Graph_Board
         int next_position = estado.path[estado.pos_idx + 1];
 
         if (tryStorm(estado, next_position, N)) {
-            std::cout << "  -> Encontrou tempestade, parada obrigatoria.\n";
             continue;
         }
 
         if (tryEnemy(estado, next_position, estados)) {
-            std::cout << "  -> Encontrou inimigo, parada obrigatoria ou formacao de alianca.\n";
             continue;
         }
 
         int weight = game_graph.calculateWeight(estado.position, next_position, N);
         move(estado, next_position, weight, castle_vertex, N);
 
-        std::cout << "  -> Movido para " << next_position
-                  << ", peso do movimento: " << weight
-                  << "peso total:" << estado.total_weight
-                  << ", status agora: " << (estado.arrived ? "CHEGOU" : "EM MOVIMENTO")
-                  << "\n";
-
         if (estado.arrived && estado.position == castle_vertex) {
             if (estado.moviments <= less_moviments_arrival) {
-                arrived_this_round.push_back(i); // guardar índice
+                arrived_this_round.push_back(i); // guardar indice
                 less_moviments_arrival = estado.moviments;
             } else {
                 estado.arrived = false; // chegou depois do vencedor
@@ -591,8 +572,6 @@ bool ArmysAttack::executeRound(std::vector<EstadoExercito> &estados, Graph_Board
             break;
         }
     }
-
-    std::cout << "Fim da RODADA " << round << "\n\n";
 
     return any_movable_left;
 }
