@@ -141,7 +141,7 @@ public:
 
     uint get_size() const { return N; };
 
-    int calculateWeight(int u, int v, int N);
+    int calcularPeso(int u, int v, int N);
 };
 
 //construtor do Grafo tabuleiro
@@ -157,7 +157,7 @@ Graph_Board::Graph_Board(uint N) : num_vertices(N*N), num_edges(0), N(N)  {
 
 //calculadora de weight q o prof pediu
 //w(u,v)=(ascii(au)_Bu+ascii(av)_Bv)mod19 (formula)
-int Graph_Board::calculateWeight(int u, int v, int N) {
+int Graph_Board::calcularPeso(int u, int v, int N) {
     int linha_u = u / N;
     int coluna_u = u % N;
 
@@ -186,7 +186,7 @@ void Graph_Board::add_edge(Vertex u, Vertex v) {
         }
     }
 
-    int weight = calculateWeight(u, v, N);
+    int weight = calcularPeso(u, v, N);
 
     //aq o adj cria uma nova aresta
     adj[u].push_back({v, weight});
@@ -261,11 +261,10 @@ struct resultPath {
     std::vector<int> caminho;
 };
 
-//struct que guarda as informacoes do exercito
 struct Army {
     std::string color;
     std::string position;
-    std::vector<std::string> enemies;
+    std::vector<std::string> friends;
 
     std::vector<int> path;
     int idx_path = 0;
@@ -273,15 +272,12 @@ struct Army {
     bool stopped = false;
 };
 
-//struct que guarda as informacoes para printar no final
 struct resultArmy {
     std::string color;
     int moviments;
     int weight;
 };
 
-//struct que guarda as condicoes do exercito
-//dps n esquecer de unir o Army e o EstadoExercito
 struct EstadoExercito {
     std::string color;
     std::vector<int> path;
@@ -290,7 +286,6 @@ struct EstadoExercito {
     int total_weight = 0;
     bool arrived = false;
     bool stopped = false;
-    std::vector<std::string> enemies;
     std::vector<std::string> allys;
     int position = -1;
 };
@@ -322,13 +317,7 @@ private:
 
     std::vector<EstadoExercito> startArmys(Graph_Board &game_graph, int N, int castel_vertex);
 
-    void insertionSortArmy(std::vector<resultArmy> &vec);
-
     bool tryEnemy(EstadoExercito &estado, int next_position, std::vector<EstadoExercito> &stateArmys);
-
-    bool tryAlly(EstadoExercito &estado, int next_position, std::vector<EstadoExercito> &stateArmys);
-
-    bool canBeAlly(const EstadoExercito &a, const EstadoExercito &b);
 
     void move(EstadoExercito &estado, int next_position, int peso, int castel_vertex, int N);
 
@@ -352,17 +341,54 @@ ArmysAttack::ArmysAttack(std::vector<Army> listArmy, std::string castelPosition,
     this->storms = storms;
 }
 
-//incrementa os atributos do estado do exercito
-//verifica se o exercito chega no castelo no proximo movimento
-void ArmysAttack::move(EstadoExercito &estado, int next_position, int peso, int castel_vertex, int N) {
-    estado.moviments++;
-    estado.total_weight += peso;
-    estado.pos_idx++;
-    estado.position = next_position;
-
-    if (next_position == castel_vertex) {
-        estado.arrived = true;
+//converte notacao tipo "a1" em coordenadas (linha, coluna)
+std::pair<int, int> ArmysAttack::ChessNotToPos(const std::string &position) {
+    if (position.size() < 2) {
+        throw std::invalid_argument("Posicao invalida");
     }
+
+    //aqui precisa do stoi pq se for a10, a11 etc da errador
+    int coluna = position[0] - 'a';
+    int linha = std::stoi(position.substr(1)) - 1;
+
+    return {linha, coluna};
+}
+
+std::vector<EstadoExercito> ArmysAttack::startArmys(Graph_Board &game_graph, int N, int castel_vertex) {
+    std::vector<EstadoExercito> estados;
+    for (auto &exercito: armys) {
+        auto [l, c] = ChessNotToPos(exercito.position);
+        int v = l * N + c;
+        resultPath res = bestPathToCastle(game_graph, v, {castel_vertex});
+
+        EstadoExercito estado;
+        estado.color = exercito.color;
+        estado.path = res.caminho;
+        estado.position = v;
+        estado.allys = exercito.friends; // copia lista de allys
+
+        estados.push_back(estado);
+    }
+    return estados;
+}
+
+//determina como a tempestade do proximo movimento sera tratada
+//se nao estiver junto de um aliado ele para, mas se estiver destroe a tempestade na hora
+bool ArmysAttack::tryStorm(EstadoExercito &estado, int next_position, int N) {
+    if (isStorm(next_position, N)) {
+        if (estado.allys.empty()) {
+            estado.stopped = true;
+            return true; // perde rodada
+        } else {
+            // remove tempestade
+            storms.erase(std::remove_if(storms.begin(), storms.end(),
+                                        [&](const std::string &s) {
+                                            auto [l, c] = ChessNotToPos(s);
+                                            return l == next_position / N && c == next_position % N;
+                                        }), storms.end());
+        }
+    }
+    return false;
 }
 
 //gera as posicoes que sao vizinhas do castelo (um cavalo pode alcancar)
@@ -392,51 +418,6 @@ std::vector<int> ArmysAttack::castleChess(const Graph_Board &game_board) {
     return listSus;
 }
 
-void ArmysAttack::insertionSortArmy(std::vector<resultArmy>& vec) {
-    if (vec.empty()) return;
-
-    for (size_t i = 1; i < vec.size(); ++i) {
-        resultArmy key = vec[i];
-        int j = static_cast<int>(i) - 1;
-        while (j >= 0 && key.color < vec[j].color) {
-            vec[j + 1] = vec[j];
-            --j;
-        }
-        vec[j + 1] = key;
-    }
-}
-
-//converte notacao tipo "a1" em coordenadas (linha, coluna)
-std::pair<int, int> ArmysAttack::ChessNotToPos(const std::string &position) {
-    if (position.size() < 2) {
-        throw std::invalid_argument("Posicao invalida");
-    }
-
-    //aqui precisa do stoi pq se for a10, a11 etc da errador
-    int coluna = position[0] - 'a';
-    int linha = std::stoi(position.substr(1)) - 1;
-
-    return {linha, coluna};
-}
-
-std::vector<EstadoExercito> ArmysAttack::startArmys(Graph_Board &game_graph, int N, int castel_vertex) {
-    std::vector<EstadoExercito> estados;
-    for (auto &exercito: armys) {
-        auto [l, c] = ChessNotToPos(exercito.position);
-        int v = l * N + c;
-        resultPath res = bestPathToCastle(game_graph, v, {castel_vertex});
-
-        EstadoExercito estado;
-        estado.color = exercito.color;
-        estado.path = res.caminho;
-        estado.position = v;
-        estado.enemies = exercito.enemies; // copia lista de inimigos
-
-        estados.push_back(estado);
-    }
-    return estados;
-}
-
 //verificacao se tem Storm na posicao do tabuleiro
 bool ArmysAttack::isStorm(int v, int N) {
     int linha = v / N;
@@ -449,131 +430,74 @@ bool ArmysAttack::isStorm(int v, int N) {
     return false;
 }
 
+//incrementa os atributos do estado do exercito
+//verifica se o exercito chega no castelo no proximo movimento
+void ArmysAttack::move(EstadoExercito &estado, int next_position, int peso, int castel_vertex, int N) {
+    estado.moviments++;
+    estado.total_weight += peso;
+    estado.pos_idx++;
+    estado.position = next_position;
+
+    if (next_position == castel_vertex) {
+        estado.arrived = true;
+    }
+}
+
 //verifica se o exercito e amiguinho ou nao
-bool ArmysAttack::canBeAlly(const EstadoExercito &a, const EstadoExercito &b) {
-    if (std::find(a.enemies.begin(), a.enemies.end(), b.color) != a.enemies.end()) {
-        return false;
-    }
-    if (std::find(b.enemies.begin(), b.enemies.end(), a.color) != b.enemies.end()) {
-        return false;
-    }
-
-    return true;
+bool isAlly(const EstadoExercito &estado, const std::string &color) {
+    return std::find(estado.allys.begin(), estado.allys.end(), color) != estado.allys.end();
 }
 
-//determina como a tempestade do proximo movimento sera tratada
-//se nao estiver junto de um aliado ele para, mas se estiver destroe a tempestade na hora
-bool ArmysAttack::tryStorm(EstadoExercito &estado, int next_position, int N) {
-    if (isStorm(next_position, N)) {
-        //se ele nao tiver nenhum amiguinho ele para
-        if (estado.allys.empty()) {
-            estado.stopped = true;
-            return true; // perde rodada
-        } else {
-            // remove tempestade de primeira
-            storms.erase(std::remove_if(storms.begin(), storms.end(),
-                                        [&](const std::string &s) {
-                                            auto [l, c] = ChessNotToPos(s);
-                                            return l == next_position / N && c == next_position % N;
-                                        }), storms.end());
-        }
-    }
-    return false;
-}
 
-// Verifica se o exercito vai encontra um aliado ou um inimigo
-bool ArmysAttack::tryEnemy(EstadoExercito &estado, int next_position, std::vector<EstadoExercito> &stateArmys) {
-    for (auto &other : stateArmys) {
-        if (other.position == next_position && !other.arrived) {
-            if (!canBeAlly(estado, other)) {
-                // inimigo encontrado, para a rodada
-                estado.stopped = true;
-                return true;
-            } else {
-                if (std::find(estado.allys.begin(), estado.allys.end(), other.color) == estado.allys.end()) {
-                    estado.allys.push_back(other.color);
-                }
-                if (std::find(other.allys.begin(), other.allys.end(), estado.color) == other.allys.end()) {
-                    other.allys.push_back(estado.color);
-                }
-            }
-        }
-    }
-    return false;
-}
-
-//funcao principal que chama as outras e verifica os estados etcr
 bool ArmysAttack::executeRound(std::vector<EstadoExercito> &estados, Graph_Board &game_graph,
                                int round, int castle_vertex, int &less_moviments_arrival) {
     int N = game_graph.get_size();
     bool moviment_happened = false;
+    std::vector<std::string> arrived_this_round;
 
-    std::vector<int> arrived_this_round;
-    std::vector<std::string> castle_occupants;
-
-    // Processa todos os exercitos nesta rodada
-    for (size_t i = 0; i < estados.size(); ++i) {
-        auto &estado = estados[i];
-
+    for (auto &estado: estados) {
         if (estado.arrived) continue;
-
         if (estado.stopped) {
-            estado.stopped = false; // libera o stop
+            estado.stopped = false;
             moviment_happened = true;
             continue;
         }
+        if (estado.pos_idx + 1 >= (int) estado.path.size()) continue;
 
-        if (estado.pos_idx + 1 >= (int)estado.path.size()) continue;
+        int proxima_pos = estado.path[estado.pos_idx + 1];
 
-        int next_position = estado.path[estado.pos_idx + 1];
-
-        if (tryStorm(estado, next_position, N)) {
+        //chama o verificar tempestade
+        if (tryStorm(estado, proxima_pos, N)) {
             continue;
         }
 
-        if (tryEnemy(estado, next_position, estados)) {
+        //chama o verificar inimigo
+        if (tryEnemy(estado, proxima_pos, estados)) {
             continue;
         }
 
-        int weight = game_graph.calculateWeight(estado.position, next_position, N);
-        move(estado, next_position, weight, castle_vertex, N);
+        int peso = game_graph.calcularPeso(estado.position, proxima_pos, N);
+        move(estado, proxima_pos, peso, castle_vertex, N);
 
-        if (estado.arrived && estado.position == castle_vertex) {
-            if (estado.moviments <= less_moviments_arrival) {
-                arrived_this_round.push_back(i); // guardar indice
-                less_moviments_arrival = estado.moviments;
-            } else {
-                estado.arrived = false; // chegou depois do vencedor
-            }
+        if (estado.arrived) {
+            arrived_this_round.push_back(estado.color);
+            less_moviments_arrival = std::min(less_moviments_arrival, estado.moviments);
         }
-
         moviment_happened = true;
     }
 
-    // Garante que aliados de fato entram junto com os vencedores
-    for (int idx : arrived_this_round) {
-        auto &estado = estados[idx];
-        for (auto &ally_color : estado.allys) {
-            for (auto &other : estados) {
-                if (other.color == ally_color &&
-                    other.moviments == estado.moviments &&
-                    other.position == castle_vertex) {
-                    other.arrived = true; // marca aliado como vencedor
-                    }
+    // parar apenas se todos que chegaram nesta rodada usaram o minimo de movimentos
+    if (!arrived_this_round.empty()) {
+        for (auto &color: arrived_this_round) {
+            auto it = std::find_if(estados.begin(), estados.end(), [&](auto &e) { return e.color == color; });
+            if (it != estados.end() && it->moviments > less_moviments_arrival) {
+                return true; // continua simulacao
             }
         }
+        return false; // pode parar
     }
 
-    // Verifica se ainda existe algum exercito que pode se mover
-    bool any_movable_left = false;
-    for (auto &estado: estados) {
-        if (!estado.arrived && !estado.stopped && estado.pos_idx + 1 < (int)estado.path.size()) {
-            any_movable_left = true;
-            break;
-        }
-    }
-
-    return any_movable_left;
+    return moviment_happened;
 }
 
 std::vector<resultArmy> ArmysAttack::processResult(const std::vector<EstadoExercito> &estados,
@@ -584,9 +508,8 @@ std::vector<resultArmy> ArmysAttack::processResult(const std::vector<EstadoExerc
             results.push_back({estado.color, estado.moviments, estado.total_weight});
         }
     }
-
-    insertionSortArmy(results);
-
+    std::sort(results.begin(), results.end(),
+              [](const resultArmy &a, const resultArmy &b) { return a.color < b.color; });
     return results;
 }
 
@@ -613,7 +536,7 @@ int ArmysAttack::chooseDestiny(const std::vector<int> &list_threats,
     return final_destiny;
 }
 
-// Dijkstr
+// Dijkstra
 std::pair<std::vector<int>, std::vector<int>> ArmysAttack::Dijkstra(Graph_Board &game_board, int at_beggining) {
     int V = game_board.get_vertices();
     int N = game_board.get_size();
@@ -660,6 +583,24 @@ std::pair<std::vector<int>, std::vector<int>> ArmysAttack::Dijkstra(Graph_Board 
     return {dist, parent};
 }
 
+//verifica se o exercito vai encontra um aliado ou um inimigo
+bool ArmysAttack::tryEnemy(EstadoExercito &estado, int next_position, std::vector<EstadoExercito> &stateArmys) {
+    for (auto &other: stateArmys) {
+        if (other.position == next_position && !other.arrived) {
+            //se ele encontrar ele perde a rodada
+            if (!isAlly(estado, other.color)) {
+                estado.stopped = true;
+                return true; // encontrou inimigo
+            } else {
+                //se for amiguinho forma uma alianca
+                estado.allys.push_back(other.color);
+                other.allys.push_back(estado.color);
+            }
+        }
+    }
+    return false;
+}
+
 resultPath ArmysAttack::bestPathToCastle(Graph_Board &game_board,
                                                int at_beggining,
                                                const std::vector<int> &list_threats) {
@@ -670,6 +611,8 @@ resultPath ArmysAttack::bestPathToCastle(Graph_Board &game_board,
 
     if (destino_final != -1) {
         auto caminho = reconstructPath(destino_final, parent);
+
+        int N = game_board.get_size();
 
         return {less_distant, caminho};
     }
@@ -725,9 +668,9 @@ int main() {
         Army army;
         iss >> army.color >> army.position;
 
-        std::string enemy;
-        while (iss >> enemy) {
-            army.enemies.push_back(enemy);
+        std::string aliado;
+        while (iss >> aliado) {
+            army.friends.push_back(aliado);
         }
 
         listArmys.push_back(army);
@@ -752,88 +695,3 @@ int main() {
 
     return 0;
 }
-/*
-                                                     .. ..---:..... .....
-                                                    ....=%@@@@@*-........
-                                                     ..-%@@@%@@@@#+*##*-... .
-                                                    ...=%@@*:-*@@@@@@@@@%=...
-                                                    ....*@@#-::=%@@@##@@@@+..
-                                                    ....:*@@%-::-**+-:=%@@@=.
-                                                    .....-#@@#:::::::::=@@@%-
-                                                        ..=@@@#:::::::::*@@@=. ..
-                                                        ...+@@@+::::::::-%@@#:. .
-            .. ..... ............                        ..:#@@@=::::::::+@@@=....
-            .:+#%#+:..-+##%%%#=.                         ...=@@@*-:::::::-@@@+....
-        ...:*@@@@@@%#@@@@@@@@@@=.                       . ...*@@%-::::::::%@@#:...
-         .=@@@@**@@@@@@%%#*%@@%-.                       . . .-@@@+::::::::%@@%-...
-        .-%@@@#:-*@@@%=::=#@@@=..                         ....%@@#-::::::-%@@%-...
-        .*@@@#-:::-=-:::+%@@%+...                         ....#@@@=:::::::%@@%-...
-       .:%@@@=:::::::::=%@@%=...                          ....*@@@*:::::::*@@%-...
-     ...-@@@#-::::::::-#@@%=.   .                         ....+@@@#-::::::+%@%-...
-    ....-@@@+:::::::::+@@@*... .                          ....+@@@#-::::::*@@#:...
-    ....-%@@+:::::::::*@@%=.                              ....*@@@#-:::::=%@@*: .
-      ..:#@@#-:::::::-%@@#-..                             ...:#@@@*-:::::+@@@+...
-        .*@@@+:::::::-%@@#:...                          . .. -@@@@+:::::-#@@%-..
-        .=@@@#-::::::-#@@%-...                           .. .*@@@*-:::::+%@@*...
-       ...#@@@*:::::::*@@%=.                            ....=@@@%=:::::-#@@@=...
-       ...-%@@%=::::::+@@@*..                           ...:#@@@+::::::=@@@%-...
-       ....=@@@#=:::::-%@@%-......  ..... ... .... . ......*@@@#-:::::-#@@@+....
-       .....+@@@#=:::::+@@@#-::-=++++++++++===--:::.......=@@@%=::::::+@@@#:.
-        ....:#@@@%=:::::*@@@@@@@@@@@@@@@@@@@@@@@@@@@%#*=-+%@@@+::::::=%@@#:..
-            .:#@@@@*-::::-*#%%%@@@%%%%%%%@@@@@@@@@@@@@@@@@@@@#-::::-*@@@*:...
-            ...*@@@@+::::::::::--::::::::::::-----==++*#%%@@@@@#=:=#@@@*.....
-            ..:#@@@#=:::::::::::::::::::::::::::::::::::::-=#@@@@%@@@@*..
-            .-#@@@*-:::::::::::::::::::::::::::::::::::::::::=#@@@@@%=...
-        ....=%@@@*:::::::::::::::::::::::::::::::::::::::::::::+@@@@%=...
-          .-%@@@*:::::::::::::::::::::::::::::::::::::::::::::::-#@@@@=..
-        ..-%@@@*::::::::::::::::::::::::::::::::::::::::::::::::::*@@@%-.....
-        .-%@@@*::::::::::::::::::::::::::::::::::::::::::::::::::::*@@@%:...
-    .. .-%@@@*-:::::::::::::::::::::::::::::::::::::::::::::::::::::*@@@*....
-     ..-#@@@*-::::::::::::----::::::::::::::::::::::::-=======-:::::-#@@@+...
-    ..:*@@@%-::::::=*%@@@@@@@@@@%##+:::::::::::::::+%@@@@@@@@@@@@%=::+@@@@-..
-    ..+@@@@+::::::*@@@@@@@@@@@@@@@@%=:::::::::::::-%@@@@@@@@@@@@@@%=.-*@@@#:
-    .-%@@@#-:::::=@@@@@@@@@@@@@@@@@@*:::::::::::::-%@@@@@@@@@@@@@@%-::-%@@@=.
-....:*@@@@=::::::=@@@@@@@@@@@@@@@@@@+:::::::::::::-#@@@@@@@@@@@@@@+::::=@@@#: ...
-. ..=%@@@#::::::::+@@@@@@@@@@@@@@@@#-::::::::::::::+@@@@@@@@@@@@@#-:::::+@@@+....
- ...*@@@%=:::::::::=%@@@@@@@@@@@@@%=::::::::::::::::+@@@@@@@@@@@+-::::::=%@@%- ..
-...-%@@@#:::::::-==::=%@@@@@@@@@@#-::::::::::::::::::=%@@@@%#+==+*+::::::+@@@+...
-. .*@@@@+:::::::-#@@@@@@@@@@@@@%=::::::::::::::::::::::=*%@@@@@@@%+::::::=%@@#-.
-..:#@@@%=:::::::::=#%@@@@@@@%*=:::::::::::::::::::::::::::-=++*+-:::::::::#@@@=..
-..-%@@@#-:::::::::::::---:::::::::::::::::::::::::::::::::::::::::::::::::*@@@+..
-..=%@@@#::::::::::::::::::::::::::::=+**##%%%###**+-::::::::::::::::::::::=@@@+..
-..=@@@@*::::::::::::::::::::::::::+%@@@@@@@@@@@@@@@@@+-:::::::::::::::::::=%@@%-.
-..-%@@@#:::::::::::::::::::::::::+%@@@@%%#*++++*#%@@@@*-::::::::::::::::::=@@@@@%-..
-...+@@@%+::::::::::::::::::::::::#@@@#-:::::::::::-%@@@+::::::::::::::::::=@@@@@@@=.
-...:#@@@@*-:::::::::::::::::::::-%@@%=:::::::::::::=%@@#=::::::::::::::::-*@@@@@@@%:
-. ..:+%@@@@*=:::::::::::::::::::=@@@*-::::::::::::::*@@@+::::::::::::::-=#@@@@@@@@*.
-    ...+%@@@@@%##**+===------::-+@@@*-:::::::-:::-:-*@@@*------====++*%@@@@@@@@@*-..
-     ...:+#%@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*-...
-          ....:-=+**##%%@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@%#**%@@@%+:. .  .
-            ..................=%@@%##%@@####%@@%##%%%%@@@@@@@%@@%*++*#@@@@#-.....
-             .................*@@@%#%@@%#*##%@@%***###@@@@%@@@@#+++*%@@@@%:......
-                            .:*@@@%%@@@##*#%@@@#*#*###@@@%%@@@#++#%@##%@@@*:.
-                            .-%@@%%@@@%**##@@@%#*####%@@@%#@@@%%@@%*+*%@@@@=.
-                         ....+@@@@@@@%#**#%@@@#***###@@@@##%@@@@%#*#%@@@@#-..
-                        . ..-%@@@@@@%####%@@@%##*#*#%@@@%#*#@@@@##@@@@@*:.  .
-                        . .:*@@@@@@%#*##@@@@%#*#**#%@@@@%#*#%@@@@@@@%+:..
-                        ...+@@@@@@###*#@@@@%#*##*##@@@@@@@#*#@@@@%*=....
-                     .....*@@@@@%#*##%@@@@%#*#####@@@@%@@@%*#%@@@#: .
-                    ... .*@@@@@##**#%@@@@%#*##**#@@@@@#%@@@#*#@@@@=..
-                    ...:#@@@@##***#@@@@@###**###%@@@@#*#%@@%*#%@@@*.....
-                    ..=@@@@%#*###%@@@@%#*#**#*#@@@@@###*#@@@%##@@@#:....
-                    :*@@@@#*#**#@@@@##*##**##%@@@@@##***#%@@%#*@@@@-....
-                .. :*@@@%#####%@@@%#*##**#*#%@@@@@@##*#**#%@@##%@@@=....
-                ...+@@@%#*#*#@@@@%######*##@@@@@@@@%**##*#%@@%##@@@=....
-                ..:@@@%#####@@@@##*##**###@@@@@##@@@#*#***%@@@#*@@@=.
-                ..-@@@#***%@@@%#**#*#####@@@@%#*#%@@%####*%@@@#*%@@+.
-                .:#@@##*#%@@@%#*#**##*##@@@@##***#@@@%###*#@@@%#%@@*.
-                .=@@@###%@@@%#*#****##@@@@@#*######@@@@##*#%@@@#%@@*:
-                .*@@@##@@@@%#*****#%@@@@@@@%#*##*#*#@@@@%#*#@@@@@@@+..
-                :#@@@#%@@@%#####%@@@@@@@@@@@@%#**####@@@@%#*#@@@@@%-..
-                :*@@@%@@@%#*#%@@@@@@@@@@@@@@@@@%#**###%@@@@%#%@@@@*...
-               ..=@@@@@@%%%@@@@@@@@@@@@@@@@@@@@@@@%%##*#%@@@@%%@@@#:.
-               ..:%@@@@@@@@@@@@@@@@@#+====+++%@@@@@@@@@%%%%@@@@@@@@*:
-                .:*@@@@@@@@%%@@@@@@+..... ....*@@@@@@@@@@@@@@@@@@@@@*....
-                ..=@@@@%*-:.:%@@@@*:...  .....*@@@@@%%@@@@@@@@@@@@@#=....
-                ...=+-:..   .-%@@#- .        .*@@@%=...-=+*****==-:..
-                     ....   . ......        ...... ..................    */
