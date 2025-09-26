@@ -329,6 +329,8 @@ private:
 
     std::pair<int, int> ChessNotToPos(const std::string &position);
 
+    std::string PosToChessNot(int v, int N);
+
 public:
     ArmysAttack(std::vector<Army> listArmy, std::string castelPosition, std::vector<std::string> storms);
 
@@ -354,21 +356,44 @@ std::pair<int, int> ArmysAttack::ChessNotToPos(const std::string &position) {
     return {linha, coluna};
 }
 
+//isso aq e so pra debug TIRAR DEPOIS
+std::string ArmysAttack::PosToChessNot(int v, int N) {
+    if (v < 0 || v >= N * N) {
+        return "Invalido";
+    }
+    int linha = v / N;
+    int coluna = v % N;
+    char alpha = 'a' + coluna;
+    return alpha + std::to_string(linha + 1);
+}
+
 std::vector<EstadoExercito> ArmysAttack::startArmys(Graph_Board &game_graph, int N, int castel_vertex) {
     std::vector<EstadoExercito> estados;
+    std::cout << "--- Caminhos Iniciais (Dijkstra) ---" << std::endl;
+
     for (auto &exercito: armys) {
         auto [l, c] = ChessNotToPos(exercito.position);
         int v = l * N + c;
         resultPath res = bestPathToCastle(game_graph, v, {castel_vertex});
 
+        // --- LOGICA DE IMPRESSAO ATUALIZADA ---
+        std::cout << "Exercito: " << exercito.color << " | Caminho: ";
+        for (size_t i = 0; i < res.caminho.size(); ++i) {
+            // Usa a nova funcao para converter o vertice para notacao de xadrez
+            std::cout << PosToChessNot(res.caminho[i], N)
+                      << (i == res.caminho.size() - 1 ? "" : " -> ");
+        }
+        std::cout << " | Peso Total do Caminho: " << res.distancia << std::endl;
+        // --- FIM DA ATUALIZACAO ---
+
         EstadoExercito estado;
         estado.color = exercito.color;
         estado.path = res.caminho;
         estado.position = v;
-        estado.allys = exercito.friends; // copia lista de allys
 
         estados.push_back(estado);
     }
+    std::cout << "------------------------------------" << std::endl << std::endl;
     return estados;
 }
 
@@ -562,7 +587,6 @@ std::pair<std::vector<int>, std::vector<int>> ArmysAttack::Dijkstra(Graph_Board 
         try {
             const auto &neighbors = game_board.get_adj(u);
             for (const auto &[neighbor, weight]: neighbors) {
-                if (isStorm(neighbor, N)) continue; // pular tempestades
 
                 if (!processed[neighbor] && dist[u] + weight < dist[neighbor]) {
                     dist[neighbor] = dist[u] + weight;
@@ -576,7 +600,8 @@ std::pair<std::vector<int>, std::vector<int>> ArmysAttack::Dijkstra(Graph_Board 
                     }
                 }
             }
-        } catch (const std::exception &e) {
+
+            } catch (const std::exception &e) {
             std::cout << "Erro ao acessar vizinhos do vertice " << std::endl;
         }
     }
