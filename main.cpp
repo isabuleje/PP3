@@ -1,10 +1,10 @@
 #include <iostream>
 #include <list>
 #include <vector>
-#include <stdexcept>
-#include <algorithm>
-#include <sstream>
-
+#include <cstdlib>
+#include <limits>
+#include <cctype>
+#include <iomanip>
 
 using Vertex = unsigned int;
 using uint = unsigned int;
@@ -13,66 +13,64 @@ template<typename T>
 class PriorityQueue {
 private:
     std::vector<T> heap;
-    std::vector<int> &dist; // Referencia para o vetor de distancias
+    std::vector<int> &dist; //referencia para o vetor de distancias
 
     int parent(int i) { return (i - 1) / 2; }
     int left(int i) { return 2 * i + 1; }
     int right(int i) { return 2 * i + 2; }
 
-    void sift_up(int i) {
-        while (i > 0 && dist[heap[i]] < dist[heap[parent(i)]]) {
-            std::swap(heap[i], heap[parent(i)]);
-            i = parent(i);
-        }
-    }
-
-    void sift_down(int i) {
-        int n = heap.size();
-        while (true) {
-            int smallest = i;
-            int l = left(i);
-            int r = right(i);
-
-            if (l < n && dist[heap[l]] < dist[heap[smallest]]) {
-                smallest = l;
-            }
-            if (r < n && dist[heap[r]] < dist[heap[smallest]]) {
-                smallest = r;
-            }
-            if (smallest != i) {
-                std::swap(heap[i], heap[smallest]);
-                i = smallest;
-            } else {
-                break;
-            }
-        }
-    }
+    void sift_up(int i);
+    void sift_down(int i);
 
 public:
     // Construtor que recebe o vetor de distancias
-    PriorityQueue(std::vector<int> &distancias) : dist(distancias) {
-    }
-
-    bool empty() const { return heap.empty(); }
+    PriorityQueue(std::vector<int> &dist) : dist(dist) {}
+    bool empty() const { return heap.empty();}
     int size() const { return heap.size(); }
-
     void insert(T element);
-
-    T minimum();
-
     T extract_min();
 
-    void decrease_key(T element);
-
-    bool contains(T element) const {
-        return std::find(heap.begin(), heap.end(), element) != heap.end();
-    }
 };
+
+template<typename T>
+void PriorityQueue<T>::sift_up(int i) {
+    while (i > 0 && dist[heap[i]] < dist[heap[parent(i)]]) {
+        std::swap(heap[i], heap[parent(i)]);
+        i = parent(i);
+    }
+}
+
+template<typename T>
+void PriorityQueue<T>::sift_down(int i) {
+    int n = heap.size();
+    while (true) {
+        int smallest = i;
+        int l = left(i);
+        int r = right(i);
+
+        if (l < n && dist[heap[l]] < dist[heap[smallest]]) {
+            smallest = l;
+        }
+        if (r < n && dist[heap[r]] < dist[heap[smallest]]) {
+            smallest = r;
+        }
+        if (smallest != i) {
+            T temp = heap[i];
+            heap[i] = heap[smallest];
+            heap[smallest] = temp;
+
+            i = smallest;
+        } else {
+            break;
+        }
+    }
+}
 
 template<typename T>
 void PriorityQueue<T>::insert(T element) {
     heap.push_back(element);
     sift_up(heap.size() - 1);
+
 }
 
 template<typename T>
@@ -83,166 +81,54 @@ T PriorityQueue<T>::extract_min() {
     T min = heap[0];
     heap[0] = heap.back();
     heap.pop_back();
+
     if (!heap.empty()) {
         sift_down(0);
     }
     return min;
 }
 
-template<typename T>
-T PriorityQueue<T>::minimum() {
-    if (heap.empty()) {
-        throw std::runtime_error("Heap vazio");
-    }
-    return heap[0];
-}
-
-template<typename T>
-//Essa funcaor e mt lentar, dps me lembro de trocar
-// Metodo para atualizar a prioridade (quando a distancia muda)
-void PriorityQueue<T>::decrease_key(T element) {
-    for (size_t i = 0; i < heap.size(); i++) {
-        if (heap[i] == element) {
-            sift_up(i);
-            break;
-        }
-    }
-}
-
-// -x-x-x-x- Classe Graph_Board baseada num grafo lista de adjacencias  -x-x-x-x-
 class Graph_Board {
 private:
     uint num_vertices;
-    uint num_edges;
-    uint N; //dimensao do tabuleiro
+    uint N;
 
-    //tirei o ponteiro pq tava foda
-    std::vector<std::vector<std::pair<Vertex, int> > > adj; //aq virou um par pois guarda o adj e o seu weight
-    std::vector<std::pair<int, int> > moviments = {
+    std::vector<std::vector<std::pair<Vertex, int>>> adj; //par do adj e peso
+    std::vector<std::pair<int, int>> moviments = {
         {1, 2}, {1, -2}, {-1, 2}, {-1, -2}, {2, 1}, {2, -1}, {-2, 1}, {-2, -1}
     };
 
-    void criarGrafo();
 
+    void createGraph();
     void insertionSort(std::vector<std::pair<Vertex, int> > &vec);
 
 public:
     Graph_Board(uint N = 8);
-
     ~Graph_Board() = default;
-
     void add_edge(Vertex u, Vertex v);
-
-    uint get_edges();
-
-    const std::vector<std::pair<Vertex, int> > &get_adj(Vertex u) const;
-
-    uint get_vertices();
-
-    uint get_size() const { return N; };
-
-    int calcularPeso(int u, int v, int N);
+    int calculateWeight(int u, int v, int N);
+    const std::vector<std::pair<Vertex, int>> &get_adj(Vertex u) const { return adj[u]; }
+    uint get_vertices() { return num_vertices; }
+    uint get_size() const { return N; }
 };
 
-//construtor do Grafo tabuleiro
-Graph_Board::Graph_Board(uint N) : num_vertices(N*N), num_edges(0), N(N)  {
-    if (num_vertices == 0) {
-        throw std::invalid_argument("Numero de vertices nao pode ser zero");
-    }
-
-    adj.resize(num_vertices);
-    criarGrafo(); //cria o grafo assim que inicializa
-}
-
-
-//calculadora de weight q o prof pediu
-//w(u,v)=(ascii(au)_Bu+ascii(av)_Bv)mod19 (formula)
-int Graph_Board::calcularPeso(int u, int v, int N) {
-    int linha_u = u / N;
-    int coluna_u = u % N;
-
-    char alpha_u = 'a' + coluna_u; //au
-    int beta_u = linha_u + 1; //bu
-
-    int linha_v = v / N;
-    int coluna_v = v % N;
-
-    char alpha_v = 'a' + coluna_v; //av
-    int beta_v = linha_v + 1; //bv
-
-    //esse int(letra) = ascii(letra) com mod 19
-    return ((int(alpha_u) * beta_u + int(alpha_v) * beta_v) % 19);
-}
-
 void Graph_Board::add_edge(Vertex u, Vertex v) {
-    if (u >= num_vertices || v >= num_vertices || u == v) {
-        throw std::invalid_argument("Valores invalidos no add_edge");
-    }
-
-    //verificar se o vizinho ja existe
-    for (const auto &neighbor: adj[u]) {
+    for (const auto &neighbor : adj[u]) {
         if (neighbor.first == v) {
             return;
         }
     }
-
-    int weight = calcularPeso(u, v, N);
-
-    //aq o adj cria uma nova aresta
+    int weight = calculateWeight(u, v, N);
     adj[u].push_back({v, weight});
     adj[v].push_back({u, weight});
-    num_edges += 1;
 }
 
-const std::vector<std::pair<Vertex, int> > &Graph_Board::get_adj(Vertex u) const {
-    if (u >= num_vertices) {
-        throw std::invalid_argument("Vertice invalido no get_adj: ");
-    }
-    return adj[u];
+Graph_Board::Graph_Board(uint N) : num_vertices(N * N), N(N) {
+    adj.resize(num_vertices);
+    createGraph();
 }
 
-uint Graph_Board::get_edges() {
-    return num_edges;
-}
-
-uint Graph_Board::get_vertices() {
-    return num_vertices;
-}
-
-//como agr o tamanho do tabuleiro pode ser maior que 8 e melhor usar o N
-void Graph_Board::criarGrafo() {
-    num_edges = 0;
-
-    for (uint line = 0; line < N; ++line) {
-        for (uint column = 0; column < N; ++column) {
-            uint vertex_origin = line * N + column;
-            for (const auto &mov: moviments) {
-                uint new_line = line + mov.first;
-                uint new_column = column + mov.second;
-                if (new_line >= 0 && new_line < N &&
-                    new_column >= 0 && new_column < N) {
-                    uint vertex_destiny = new_line * N + new_column;
-                    if (vertex_origin < vertex_destiny) {
-                        add_edge(vertex_origin, vertex_destiny);
-                    }
-                }
-            }
-        }
-    }
-
-    //aq usa o sort feito manualmente
-    for (uint u = 0; u < num_vertices; ++u) {
-        if (!adj[u].empty()) {
-            insertionSort(adj[u]);
-        }
-    }
-}
-
-void Graph_Board::insertionSort(std::vector<std::pair<Vertex, int> > &vec) {
-    if (vec.empty()) {
-        return;
-    }
-
+void Graph_Board::insertionSort(std::vector<std::pair<Vertex, int>> &vec) {
     for (size_t i = 1; i < vec.size(); i++) {
         auto key = vec[i];
         int j = i - 1;
@@ -254,22 +140,56 @@ void Graph_Board::insertionSort(std::vector<std::pair<Vertex, int> > &vec) {
     }
 }
 
-// ----------------- Estrutura auxiliar para guardar o path -----------------
-// ta aqui a struct que guarda a distancia e o path percorrido
+//static aqui pois o hackerhank da aviso de compilacao
+void Graph_Board::createGraph() {
+    for (uint line = 0; line < N; ++line) {
+        for (uint column = 0; column < N; ++column) {
+            uint vertex_origin = line * N + column;
+            for (const auto &mov: moviments) {
+                int new_line = line + mov.first;
+                int new_column = column + mov.second;
+                if (new_line >= 0 && new_line < static_cast<int>(N)  &&
+                    new_column >= 0 && new_column < static_cast<int>(N) ) {
+                    uint vertex_destiny = new_line * static_cast<int>(N)  + new_column;
+                    if (vertex_origin < vertex_destiny) {
+                        add_edge(vertex_origin, vertex_destiny);
+                    }
+                    }
+            }
+        }
+    }
+    for (uint u = 0; u < num_vertices; ++u) {
+        if (!adj[u].empty()) {
+            insertionSort(adj[u]);
+        }
+    }
+}
+
+int Graph_Board::calculateWeight(int u, int v, int N) {
+    int line_u = u / N;
+    int column_u = u % N;
+
+    char alpha_u = 'a' + column_u; //au
+    int beta_u = line_u + 1; //bu
+
+    int line_v = v / N;
+    int column_v = v % N;
+
+    char alpha_v = 'a' + column_v; //av
+    int beta_v = line_v + 1; //bv
+    return ((int(alpha_u) * beta_u + int(alpha_v) * beta_v) % 19);
+};
+
+// Estruturas auxiliaresr
 struct resultPath {
-    int distancia;
-    std::vector<int> caminho;
+    int dist;
+    std::vector<int> path;
 };
 
 struct Army {
     std::string color;
     std::string position;
-    std::vector<std::string> friends;
-
-    std::vector<int> path;
-    int idx_path = 0;
-    bool arrived = false;
-    bool stopped = false;
+    std::vector<std::string> enemies;
 };
 
 struct resultArmy {
@@ -286,425 +206,302 @@ struct EstadoExercito {
     int total_weight = 0;
     bool arrived = false;
     bool stopped = false;
+    std::vector<std::string> enemies;
     std::vector<std::string> allys;
     int position = -1;
+    int arrival_round = -1;
 };
 
-
-// -x-x-x-x- Classe AtaqueDosExercitos  -x-x-x-x-
 class ArmysAttack {
 private:
     std::vector<Army> armys;
     std::string castelPosition;
     std::vector<std::string> storms;
 
-    //metodos (ta gigante D: pq eu modularizei tudo q conseguia)
-    std::vector<int> castleChess(const Graph_Board &game_board);
-
-    bool isStorm(int v, int N);
-
-    resultPath bestPathToCastle(Graph_Board &game_board, int at_beggining,
-                                                   const std::vector<int> &list_threats);
-
-    std::pair<std::vector<int>, std::vector<int> > Dijkstra(Graph_Board &game_board, int at_beggining);
-
-    int chooseDestiny(const std::vector<int> &list_threats, const std::vector<int> &dist,
-                                   int &less_distancy);
-
-    std::vector<int> reconstructPath(int destiny, const std::vector<int> &parent);
-
-    bool tryStorm(EstadoExercito &estado, int next_position, int N);
-
-    std::vector<EstadoExercito> startArmys(Graph_Board &game_graph, int N, int castel_vertex);
-
-    bool tryEnemy(EstadoExercito &estado, int next_position, std::vector<EstadoExercito> &stateArmys);
-
-    void move(EstadoExercito &estado, int next_position, int peso, int castel_vertex, int N);
-
-    bool executeRound(std::vector<EstadoExercito> &estados, Graph_Board &game_graph, int round, int castle_vertex,
-                      int &less_moviments_arrival);
-
-    std::vector<resultArmy>
-    processResult(const std::vector<EstadoExercito> &estados, int less_moviments_arrival);
-
     std::pair<int, int> ChessNotToPos(const std::string &position);
-
-    std::string PosToChessNot(int v, int N);
+    bool isStorm(int vertex, int N);
+    std::vector<int> reconstructPath(int destiny, const std::vector<int> &parent);
+    int chooseDestiny(const std::vector<int> &list_threats, const std::vector<int> &dist, int &less_distancy);
+    resultPath bestPathToCastle(Graph_Board &game_board, int at_beggining, const std::vector<int> &list_threats);
+    std::pair<std::vector<int>, std::vector<int>> Dijkstra(Graph_Board &game_board, int at_beggining);
+    std::vector<EstadoExercito> startArmys(Graph_Board &game_graph, int N, int castel_vertex);
+    void move(EstadoExercito &state_army, int next_position, int weight, int castel_vertex, int N, int round);
+    bool tryEnemy(EstadoExercito &state, int next_position, std::vector<EstadoExercito> &stateArmys);
+    void executeRound(std::vector<EstadoExercito> &state_army, Graph_Board &game_graph, int round, int castle_vertex);
+    std::vector<resultArmy> processResult(const std::vector<EstadoExercito> &state_army);
+    void insertionSortArmy(std::vector<resultArmy> &vec);
+    bool canBeAlly(const EstadoExercito &a, const EstadoExercito &b);
+    bool contains(const std::vector<std::string>& vec, const std::string& value);
 
 public:
     ArmysAttack(std::vector<Army> listArmy, std::string castelPosition, std::vector<std::string> storms);
-
     void solve_game(Graph_Board &game_board);
 };
 
-ArmysAttack::ArmysAttack(std::vector<Army> listArmy, std::string castelPosition, std::vector<std::string> storms) {
-    this->castelPosition = castelPosition;
-    this->armys = listArmy;
-    this->storms = storms;
-}
 
-//converte notacao tipo "a1" em coordenadas (linha, coluna)
-std::pair<int, int> ArmysAttack::ChessNotToPos(const std::string &position) {
-    if (position.size() < 2) {
-        throw std::invalid_argument("Posicao invalida");
+bool ArmysAttack::canBeAlly(const EstadoExercito &a, const EstadoExercito &b) {
+    if (contains(a.enemies, b.color)) {
+        return false;
     }
-
-    //aqui precisa do stoi pq se for a10, a11 etc da errador
-    int coluna = position[0] - 'a';
-    int linha = std::stoi(position.substr(1)) - 1;
-
-    return {linha, coluna};
-}
-
-//isso aq e so pra debug TIRAR DEPOIS
-std::string ArmysAttack::PosToChessNot(int v, int N) {
-    if (v < 0 || v >= N * N) {
-        return "Invalido";
+    if (contains(b.enemies, a.color)) {
+        return false;
     }
-    int linha = v / N;
-    int coluna = v % N;
-    char alpha = 'a' + coluna;
-    return alpha + std::to_string(linha + 1);
+    return true;
 }
 
-std::vector<EstadoExercito> ArmysAttack::startArmys(Graph_Board &game_graph, int N, int castel_vertex) {
-    std::vector<EstadoExercito> estados;
-    std::cout << "--- Caminhos Iniciais (Dijkstra) ---" << std::endl;
+ArmysAttack::ArmysAttack(std::vector<Army> la, std::string cp, std::vector<std::string> s) : armys(la), castelPosition(cp), storms(s) {}
 
-    for (auto &exercito: armys) {
-        auto [l, c] = ChessNotToPos(exercito.position);
-        int v = l * N + c;
-        resultPath res = bestPathToCastle(game_graph, v, {castel_vertex});
-
-        // --- LOGICA DE IMPRESSAO ATUALIZADA ---
-        std::cout << "Exercito: " << exercito.color << " | Caminho: ";
-        for (size_t i = 0; i < res.caminho.size(); ++i) {
-            // Usa a nova funcao para converter o vertice para notacao de xadrez
-            std::cout << PosToChessNot(res.caminho[i], N)
-                      << (i == res.caminho.size() - 1 ? "" : " -> ");
-        }
-        std::cout << " | Peso Total do Caminho: " << res.distancia << std::endl;
-        // --- FIM DA ATUALIZACAO ---
-
-        EstadoExercito estado;
-        estado.color = exercito.color;
-        estado.path = res.caminho;
-        estado.position = v;
-
-        estados.push_back(estado);
-    }
-    std::cout << "------------------------------------" << std::endl << std::endl;
-    return estados;
+std::pair<int, int> ArmysAttack::ChessNotToPos(const std::string &pos) {
+    return {std::stoi(pos.substr(1)) - 1, pos[0] - 'a'};
 }
 
-//determina como a tempestade do proximo movimento sera tratada
-//se nao estiver junto de um aliado ele para, mas se estiver destroe a tempestade na hora
-bool ArmysAttack::tryStorm(EstadoExercito &estado, int next_position, int N) {
-    if (isStorm(next_position, N)) {
-        if (estado.allys.empty()) {
-            estado.stopped = true;
-            return true; // perde rodada
-        } else {
-            // remove tempestade
-            storms.erase(std::remove_if(storms.begin(), storms.end(),
-                                        [&](const std::string &s) {
-                                            auto [l, c] = ChessNotToPos(s);
-                                            return l == next_position / N && c == next_position % N;
-                                        }), storms.end());
-        }
+bool ArmysAttack::isStorm(int vertex, int N) {
+    for (auto &s : storms) {
+        auto [line, row] = ChessNotToPos(s);
+        if (vertex == line * N + row) return true;
     }
     return false;
 }
 
-//gera as posicoes que sao vizinhas do castelo (um cavalo pode alcancar)
-std::vector<int> ArmysAttack::castleChess(const Graph_Board &game_board) {
-    //moviments dos exercitos em formato de L (fazuelli)
-    const std::vector<std::pair<int, int> > movimentos = {
-        {2, 1}, {2, -1}, {-2, 1}, {-2, -1}, {1, 2}, {1, -2}, {-1, 2}, {-1, -2}
-    };
-
-    int column = castelPosition[0] - 'a';
-    int line = std::stoi(castelPosition.substr(1)) - 1;
-
-    //a listSus e uma possivel lista de ameacas ao castelo
-    std::vector<int> listSus;
-
-    int board_size = static_cast<int>(game_board.get_size());
-
-    for (auto mov: movimentos) {
-        int new_line = line + mov.first;
-        int new_column = column + mov.second;
-
-        if (new_line >= 0 && new_line < board_size  && new_column >= 0 && new_column < board_size) {
-            listSus.push_back(new_line * board_size  + new_column);
-        }
-    }
-
-    return listSus;
-}
-
-//verificacao se tem Storm na posicao do tabuleiro
-bool ArmysAttack::isStorm(int v, int N) {
-    int linha = v / N;
-    int coluna = v % N;
-
-    for (auto &s: storms) {
-        auto [l, c] = ChessNotToPos(s);
-        if (l == linha && c == coluna) return true;
-    }
-    return false;
-}
-
-//incrementa os atributos do estado do exercito
-//verifica se o exercito chega no castelo no proximo movimento
-void ArmysAttack::move(EstadoExercito &estado, int next_position, int peso, int castel_vertex, int N) {
-    estado.moviments++;
-    estado.total_weight += peso;
-    estado.pos_idx++;
-    estado.position = next_position;
-
-    if (next_position == castel_vertex) {
-        estado.arrived = true;
-    }
-}
-
-//verifica se o exercito e amiguinho ou nao
-bool isAlly(const EstadoExercito &estado, const std::string &color) {
-    return std::find(estado.allys.begin(), estado.allys.end(), color) != estado.allys.end();
-}
-
-
-bool ArmysAttack::executeRound(std::vector<EstadoExercito> &estados, Graph_Board &game_graph,
-                               int round, int castle_vertex, int &less_moviments_arrival) {
-    int N = game_graph.get_size();
-    bool moviment_happened = false;
-    std::vector<std::string> arrived_this_round;
-
-    for (auto &estado: estados) {
-        if (estado.arrived) continue;
-        if (estado.stopped) {
-            estado.stopped = false;
-            moviment_happened = true;
-            continue;
-        }
-        if (estado.pos_idx + 1 >= (int) estado.path.size()) continue;
-
-        int proxima_pos = estado.path[estado.pos_idx + 1];
-
-        //chama o verificar tempestade
-        if (tryStorm(estado, proxima_pos, N)) {
-            continue;
-        }
-
-        //chama o verificar inimigo
-        if (tryEnemy(estado, proxima_pos, estados)) {
-            continue;
-        }
-
-        int peso = game_graph.calcularPeso(estado.position, proxima_pos, N);
-        move(estado, proxima_pos, peso, castle_vertex, N);
-
-        if (estado.arrived) {
-            arrived_this_round.push_back(estado.color);
-            less_moviments_arrival = std::min(less_moviments_arrival, estado.moviments);
-        }
-        moviment_happened = true;
-    }
-
-    // parar apenas se todos que chegaram nesta rodada usaram o minimo de movimentos
-    if (!arrived_this_round.empty()) {
-        for (auto &color: arrived_this_round) {
-            auto it = std::find_if(estados.begin(), estados.end(), [&](auto &e) { return e.color == color; });
-            if (it != estados.end() && it->moviments > less_moviments_arrival) {
-                return true; // continua simulacao
-            }
-        }
-        return false; // pode parar
-    }
-
-    return moviment_happened;
-}
-
-std::vector<resultArmy> ArmysAttack::processResult(const std::vector<EstadoExercito> &estados,
-                                                          int less_moviments_arrival) {
-    std::vector<resultArmy> results;
-    for (auto &estado: estados) {
-        if (estado.arrived && estado.moviments == less_moviments_arrival) {
-            results.push_back({estado.color, estado.moviments, estado.total_weight});
-        }
-    }
-    std::sort(results.begin(), results.end(),
-              [](const resultArmy &a, const resultArmy &b) { return a.color < b.color; });
-    return results;
-}
-
-std::vector<int> ArmysAttack::reconstructPath(int destiny, const std::vector<int> &parent) {
+std::vector<int> ArmysAttack::reconstructPath(int d, const std::vector<int> &p) {
     std::vector<int> path;
-    for (int v = destiny; v != -1; v = parent[v]) {
-        path.push_back(v);
+    for (int v = d; v != -1; v = p[v]) {
+        path.insert(path.begin(), v);
     }
-    std::reverse(path.begin(), path.end());
     return path;
 }
 
-int ArmysAttack::chooseDestiny(const std::vector<int> &list_threats,
-                               const std::vector<int> &dist,
-                               int &less_distancy) {
+int ArmysAttack::chooseDestiny(const std::vector<int> &list_threats, const std::vector<int> &dist, int &less_distancy) {
     int final_destiny = -1;
     less_distancy = 1e9;
-    for (int pos_alvo: list_threats) {
-        if (dist[pos_alvo] < less_distancy) {
-            less_distancy = dist[pos_alvo];
-            final_destiny = pos_alvo;
+    for (int target_pos : list_threats) {
+        if (dist[target_pos] < less_distancy) {
+            less_distancy = dist[target_pos];
+            final_destiny = target_pos;
         }
     }
     return final_destiny;
 }
 
-// Dijkstra
+resultPath ArmysAttack::bestPathToCastle(Graph_Board &game_board, int at_beggining, const std::vector<int> &list_threats) {
+    auto [dist, parent] = Dijkstra(game_board, at_beggining);
+    int less_distance;
+    int final_destiny = chooseDestiny(list_threats, dist, less_distance);
+
+    if (final_destiny != -1) {
+        return {less_distance, reconstructPath(final_destiny, parent)};
+    }
+    return {-1, {}};
+}
+
 std::pair<std::vector<int>, std::vector<int>> ArmysAttack::Dijkstra(Graph_Board &game_board, int at_beggining) {
     int V = game_board.get_vertices();
-    int N = game_board.get_size();
-
     std::vector<int> dist(V, 1e9);
     std::vector<int> parent(V, -1);
-    std::vector<bool> processed(V, false);
-    std::vector<bool> inHeap(V, false);
-
+    std::vector<int> moves(V, 1e9);
     PriorityQueue<int> pq(dist);
 
     dist[at_beggining] = 0;
+    moves[at_beggining] = 0;
     pq.insert(at_beggining);
-    inHeap[at_beggining] = true;
 
     while (!pq.empty()) {
         int u = pq.extract_min();
-        inHeap[u] = false;
+        if (dist[u] == 1e9) {
+            continue;
+        }
 
-        if (processed[u]) continue;
-        processed[u] = true;
-
-        try {
-            const auto &neighbors = game_board.get_adj(u);
-            for (const auto &[neighbor, weight]: neighbors) {
-
-                if (!processed[neighbor] && dist[u] + weight < dist[neighbor]) {
-                    dist[neighbor] = dist[u] + weight;
+        for (const auto &[neighbor, weight] : game_board.get_adj(u)) {
+            if (dist[u] + weight < dist[neighbor]) {
+                dist[neighbor] = dist[u] + weight;
+                parent[neighbor] = u;
+                moves[neighbor] = moves[u] + 1;
+                pq.insert(neighbor);
+            } else if (dist[u] + weight == dist[neighbor]) {
+                if (moves[u] + 1 < moves[neighbor]) {
                     parent[neighbor] = u;
-
-                    if (inHeap[neighbor]) {
-                        pq.decrease_key(neighbor);
-                    } else {
-                        pq.insert(neighbor);
-                        inHeap[neighbor] = true;
-                    }
+                    moves[neighbor] = moves[u] + 1;
                 }
             }
-
-            } catch (const std::exception &e) {
-            std::cout << "Erro ao acessar vizinhos do vertice " << std::endl;
         }
     }
     return {dist, parent};
 }
 
-//verifica se o exercito vai encontra um aliado ou um inimigo
-bool ArmysAttack::tryEnemy(EstadoExercito &estado, int next_position, std::vector<EstadoExercito> &stateArmys) {
-    for (auto &other: stateArmys) {
-        if (other.position == next_position && !other.arrived) {
-            //se ele encontrar ele perde a rodada
-            if (!isAlly(estado, other.color)) {
-                estado.stopped = true;
-                return true; // encontrou inimigo
+std::vector<EstadoExercito> ArmysAttack::startArmys(Graph_Board &game_graph, int N, int castel_vertex) {
+    std::vector<EstadoExercito> estados;
+    for (auto &exercito : armys) {
+        auto [line, row] = ChessNotToPos(exercito.position);
+        resultPath result = bestPathToCastle(game_graph, line * N + row, {castel_vertex});
+
+        EstadoExercito estado;
+        estado.color = exercito.color;
+        estado.path = result.path;
+        estado.position = line * N + row;
+        estado.enemies = exercito.enemies;
+        estados.push_back(estado);
+    }
+    return estados;
+}
+
+void ArmysAttack::move(EstadoExercito &state_army, int next_position, int weight, int castel_vertex, int N, int round) {
+    state_army.moviments++;
+    state_army.total_weight += weight;
+    state_army.pos_idx++;
+    state_army.position = next_position;
+
+    if (next_position == castel_vertex && !state_army.arrived) {
+        state_army.arrived = true;
+        state_army.arrival_round = round;
+    }
+}
+
+bool ArmysAttack::contains(const std::vector<std::string>& vec, const std::string& value) {
+    for (size_t i = 0; i < vec.size(); ++i) {
+        if (vec[i] == value) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ArmysAttack::tryEnemy(EstadoExercito &state, int next_position, std::vector<EstadoExercito> &stateArmys) {
+    for (auto &other : stateArmys) {
+        if (&other != &state && other.position == next_position && !other.arrived) {
+            if (!canBeAlly(state, other)) {
+                state.stopped = true;
+                return true;
             } else {
-                //se for amiguinho forma uma alianca
-                estado.allys.push_back(other.color);
-                other.allys.push_back(estado.color);
+                if (!contains(state.allys, other.color)) {
+                    state.allys.push_back(other.color);
+                }
+                if (!contains(other.allys, state.color)) {
+                    other.allys.push_back(state.color);
+                }
             }
         }
     }
     return false;
 }
 
-resultPath ArmysAttack::bestPathToCastle(Graph_Board &game_board,
-                                               int at_beggining,
-                                               const std::vector<int> &list_threats) {
-    auto [dist, parent] = Dijkstra(game_board, at_beggining);
+void ArmysAttack::executeRound(std::vector<EstadoExercito> &state_army, Graph_Board &game_graph, int round, int castle_vertex) {
+    int N = game_graph.get_size();
+    for (auto &estado : state_army) {
+        if (estado.arrived || estado.stopped) continue;
+        if (static_cast<size_t>(estado.pos_idx + 1) >= estado.path.size()) continue;
 
-    int less_distant;
-    int destino_final = chooseDestiny(list_threats, dist, less_distant);
+        int next_pos = estado.path[estado.pos_idx + 1];
 
-    if (destino_final != -1) {
-        auto caminho = reconstructPath(destino_final, parent);
+        if (isStorm(next_pos, N)) {
+            bool is_ally= false;
+            for(const auto& outro : state_army) {
+                if(&outro != &estado && outro.position == estado.position && canBeAlly(estado, outro)) {
+                    is_ally = true;
+                    break;
+                }
+            }
+            if(!is_ally){
+                 estado.stopped = true;
+                 continue;
+            }
+        }
 
-        int N = game_board.get_size();
+        if (tryEnemy(estado, next_pos, state_army)) continue;
 
-        return {less_distant, caminho};
+        move(estado, next_pos, game_graph.calculateWeight(estado.position, next_pos, N), castle_vertex, N, round);
     }
 
-    return {-1, {}};
+    for(auto& estado : state_army) if(estado.stopped) estado.stopped = false;
 }
 
-//solucionar executa o calculo para todos os exercitos
+std::vector<resultArmy> ArmysAttack::processResult(const std::vector<EstadoExercito> &state_army) {
+    std::vector<resultArmy> results;
+    std::vector<const EstadoExercito*> arrived;
+    for(const auto& e : state_army) if(e.arrived) arrived.push_back(&e);
+
+    if (arrived.empty()) return results;
+
+    int min_round = 1e9;
+    for(const auto* v : arrived) {
+        if(v->arrival_round < min_round) {
+            min_round = v->arrival_round;
+        }
+    }
+    for(const auto* final_state : arrived) {
+        if(final_state->arrival_round == min_round) {
+            results.push_back({final_state->color, final_state->moviments, final_state->total_weight});
+        }
+    }
+    insertionSortArmy(results);
+    return results;
+}
+
+void ArmysAttack::insertionSortArmy(std::vector<resultArmy> &vec) {
+    for (size_t i = 1; i < vec.size(); i++) {
+        auto key = vec[i];
+        int j = i - 1;
+        while (j >= 0 && vec[j].color > key.color) {
+            vec[j + 1] = vec[j];
+            j--;
+        }
+        vec[j + 1] = key;
+    }
+}
+
 void ArmysAttack::solve_game(Graph_Board &game_board) {
     int N = game_board.get_size();
-    int castel_vertex = ChessNotToPos(castelPosition).first * N + ChessNotToPos(castelPosition).second;
+    auto [l, c] = ChessNotToPos(castelPosition);
+    int castel_vertex = l * N + c;
 
-    auto estados = startArmys(game_board, N, castel_vertex);
+    auto states = startArmys(game_board, N, castel_vertex);
 
-    int rodada = 0;
-    int menor_movimentos_chegada = 1e9;
-
-    while (rodada < 50) {
-        rodada++;
-        bool continuar = executeRound(estados, game_board, rodada, castel_vertex, menor_movimentos_chegada);
-        if (!continuar) break;
+    for (int rounds = 1; rounds <= 100; ++rounds) {
+        executeRound(states, game_board, rounds, castel_vertex);
+        bool all_arrived_or_stopped = true;
+        for(const auto& estado : states) {
+            if (!estado.arrived) {
+                all_arrived_or_stopped = false;
+                break;
+            }
+        }
+        if(all_arrived_or_stopped) break;
     }
 
-    auto results = processResult(estados, menor_movimentos_chegada);
+    auto results = processResult(states);
 
-    //imprime a lista de resultados finais
-    for (auto &results: results) {
-        std::cout << results.color << " " << results.moviments << " " << results.weight << " ";
+    for (size_t i = 0; i < results.size(); ++i) {
+        std::cout << results[i].color << " " << results[i].moviments << " " << results[i].weight << (i == results.size() - 1 ? "" : " ");
     }
 }
 
 int main() {
-    int line = 0;
-    std::cin >> line; //linhas e colunas sao a mesma quantidade D:
+    int line;
+    std::cin >> line;
 
-    //um "catch" para caso a quantidade de linhas/colunas nao respeitem as regras
-    if (line < 8 || line > 15) {
-        throw std::invalid_argument("O numero de colunas linhas deve ser maior que 8 e menor que 15");
-    }
+    if (line < 8 || line > 15) return 1;
 
     int armyNumber;
     std::cin >> armyNumber;
     std::cin.ignore();
 
     std::vector<Army> listArmys;
-
-    //loop para adicionar as cores do exercito, inimigos, local de inicio etc no listaExercitos
     for (int i = 0; i < armyNumber; i++) {
-        std::string line;
-        std::getline(std::cin, line); // le a linha inteira
-
-        std::istringstream iss(line);
+        std::string ln;
+        std::getline(std::cin, ln);
+        std::istringstream iss(ln);
         Army army;
         iss >> army.color >> army.position;
+        std::string enemy;
 
-        std::string aliado;
-        while (iss >> aliado) {
-            army.friends.push_back(aliado);
+        while (iss >> enemy) {
+            army.enemies.push_back(enemy);
         }
-
         listArmys.push_back(army);
     }
 
     std::string castelPosition;
     std::cin >> castelPosition;
 
-    //adiciona as tormentas a uma lista
     int stormsNumber;
     std::cin >> stormsNumber;
     std::vector<std::string> stormsPositions(stormsNumber);
@@ -712,11 +509,9 @@ int main() {
         std::cin >> stormsPositions[i];
     }
 
-    //cria tabuleiro e executa a simulacao
     Graph_Board tab(line);
     ArmysAttack jogo(listArmys, castelPosition, stormsPositions);
     jogo.solve_game(tab);
-
 
     return 0;
 }
